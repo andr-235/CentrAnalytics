@@ -39,3 +39,7 @@ build/
 .env
 .env.*
 !.env.example
+
+### Local Tooling And Temp Files ###
+.tools/
+.tmp*
