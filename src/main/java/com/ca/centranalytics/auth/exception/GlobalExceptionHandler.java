@@ -1,5 +1,10 @@
 package com.ca.centranalytics.auth.exception;
 
+import com.ca.centranalytics.integration.api.dto.ErrorResponse;
+import com.ca.centranalytics.integration.api.exception.IntegrationNotFoundException;
+import com.ca.centranalytics.integration.api.exception.WebhookVerificationException;
+import com.ca.centranalytics.integration.channel.telegram.user.exception.TelegramUserModeDisabledException;
+import com.ca.centranalytics.integration.channel.telegram.user.exception.TelegramUserSessionConflictException;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureException;
@@ -31,27 +36,27 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Invalid username or password");
     }
 
     @ExceptionHandler(UserAlreadyExistsException.class)
-    public ResponseEntity<Map<String, String>> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+    public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExistsException ex) {
         return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<Map<String, String>> handleCustomAuthenticationException(AuthenticationException ex) {
+    public ResponseEntity<ErrorResponse> handleCustomAuthenticationException(AuthenticationException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, String>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         return buildErrorResponse(HttpStatus.CONFLICT, "Username is already taken");
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
@@ -61,18 +66,36 @@ public class GlobalExceptionHandler {
             MalformedJwtException.class,
             SignatureException.class
     })
-    public ResponseEntity<Map<String, String>> handleJwtExceptions(RuntimeException ex) {
+    public ResponseEntity<ErrorResponse> handleJwtExceptions(RuntimeException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
     }
 
+    @ExceptionHandler(WebhookVerificationException.class)
+    public ResponseEntity<ErrorResponse> handleWebhookVerificationException(WebhookVerificationException ex) {
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(IntegrationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleIntegrationNotFound(IntegrationNotFoundException ex) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(TelegramUserSessionConflictException.class)
+    public ResponseEntity<ErrorResponse> handleTelegramUserSessionConflict(TelegramUserSessionConflictException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(TelegramUserModeDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleTelegramUserModeDisabled(TelegramUserModeDisabledException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGenericException(Exception ex) {
+    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
     }
 
-    private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
-        Map<String, String> error = new HashMap<>();
-        error.put("error", message);
-        return ResponseEntity.status(status).body(error);
+    private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(new ErrorResponse(message));
     }
 }

@@ -1,0 +1,75 @@
+package com.ca.centranalytics.integration.config;
+
+import com.ca.centranalytics.integration.channel.telegram.config.TelegramProperties;
+import com.ca.centranalytics.integration.channel.telegram.user.config.TelegramUserProperties;
+import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.test.context.TestPropertySource;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest(classes = IntegrationPropertiesTest.TestConfig.class)
+@TestPropertySource(properties = {
+        "integration.vk.group-id=42",
+        "integration.vk.secret=vk-secret",
+        "integration.vk.confirmation-code=vk-confirm",
+        "integration.vk.access-token=vk-token",
+        "integration.vk.webhook-path=/api/integrations/webhooks/vk",
+        "integration.telegram.bot-token=tg-token",
+        "integration.telegram.webhook-secret=tg-secret",
+        "integration.telegram.webhook-path=/api/integrations/webhooks/telegram/tg-token",
+        "integration.telegram.bot-username=centranalytics_bot",
+        "integration.telegram-user.enabled=true",
+        "integration.telegram-user.api-id=12345",
+        "integration.telegram-user.api-hash=hash-value",
+        "integration.telegram-user.database-dir=.tdlib/db",
+        "integration.telegram-user.files-dir=.tdlib/files",
+        "integration.telegram-user.system-language-code=ru",
+        "integration.telegram-user.device-model=CentrAnalytics",
+        "integration.telegram-user.system-version=server",
+        "integration.telegram-user.application-version=1.0.0"
+})
+class IntegrationPropertiesTest {
+
+    @Autowired
+    private VkProperties vkProperties;
+
+    @Autowired
+    private TelegramProperties telegramProperties;
+
+    @Autowired
+    private TelegramUserProperties telegramUserProperties;
+
+    @Test
+    void bindsVkAndTelegramProperties() {
+        assertThat(vkProperties.groupId()).isEqualTo(42L);
+        assertThat(vkProperties.secret()).isEqualTo("vk-secret");
+        assertThat(vkProperties.confirmationCode()).isEqualTo("vk-confirm");
+        assertThat(vkProperties.accessToken()).isEqualTo("vk-token");
+        assertThat(vkProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/vk");
+
+        assertThat(telegramProperties.botToken()).isEqualTo("tg-token");
+        assertThat(telegramProperties.webhookSecret()).isEqualTo("tg-secret");
+        assertThat(telegramProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/telegram/tg-token");
+        assertThat(telegramProperties.botUsername()).isEqualTo("centranalytics_bot");
+
+        assertThat(telegramUserProperties.enabled()).isTrue();
+        assertThat(telegramUserProperties.apiId()).isEqualTo(12345);
+        assertThat(telegramUserProperties.apiHash()).isEqualTo("hash-value");
+        assertThat(telegramUserProperties.databaseDir()).isEqualTo(".tdlib/db");
+        assertThat(telegramUserProperties.filesDir()).isEqualTo(".tdlib/files");
+        assertThat(telegramUserProperties.systemLanguageCode()).isEqualTo("ru");
+        assertThat(telegramUserProperties.deviceModel()).isEqualTo("CentrAnalytics");
+        assertThat(telegramUserProperties.systemVersion()).isEqualTo("server");
+        assertThat(telegramUserProperties.applicationVersion()).isEqualTo("1.0.0");
+    }
+
+    @Configuration
+    @EnableConfigurationProperties({VkProperties.class, TelegramProperties.class, TelegramUserProperties.class})
+    static class TestConfig {
+    }
+}

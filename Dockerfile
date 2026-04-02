@@ -1,10 +1,15 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM openjdk:26-ea-jdk AS build
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
+RUN microdnf install -y maven && microdnf clean all
+
+COPY pom.xml .
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -DskipTests
+
+COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests
+
+FROM openjdk:26-ea-jdk
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080

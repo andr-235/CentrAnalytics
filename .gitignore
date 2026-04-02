@@ -34,3 +34,8 @@ build/
 
 ### Qwen Code ###
 .qwen/
+
+### Local Environment ###
+.env
+.env.*
+!.env.example

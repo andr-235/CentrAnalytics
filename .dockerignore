@@ -1,0 +1,10 @@
+.git
+.idea
+.qwen
+.tools
+target
+docs
+*.log
+.tmp*
+.env
+node_modules
