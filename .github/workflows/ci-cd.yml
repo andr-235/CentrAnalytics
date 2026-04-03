@@ -1,0 +1,157 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  JAVA_VERSION: "26"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Run tests
+        run: ./mvnw test
+
+  build_and_push:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name != 'pull_request'
+    outputs:
+      image_name: ${{ steps.image_meta.outputs.image_name }}
+      image_tag: ${{ steps.image_meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image metadata
+        id: image_meta
+        run: |
+          owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "image_name=ghcr.io/${owner_lc}/centranalytics" >> "$GITHUB_OUTPUT"
+          echo "image_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image_meta.outputs.image_name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.image_meta.outputs.image_tag }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          source: compose.prod.yaml
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          APP_IMAGE: ${{ needs.build_and_push.outputs.image_name }}:${{ needs.build_and_push.outputs.image_tag }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          envs: APP_IMAGE,DEPLOY_PATH,GHCR_USERNAME,GHCR_TOKEN,HEALTHCHECK_URL
+          script: |
+            set -euo pipefail
+
+            mkdir -p "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
+
+            if [ ! -f .env ]; then
+              echo "Missing $DEPLOY_PATH/.env on server" >&2
+              exit 1
+            fi
+
+            if [ ! -f compose.prod.yaml ]; then
+              echo "Missing $DEPLOY_PATH/compose.prod.yaml on server" >&2
+              exit 1
+            fi
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+            APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml pull app
+            APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans
+
+            healthcheck_url="${HEALTHCHECK_URL:-http://127.0.0.1:8080/actuator/health}"
+
+            for _ in $(seq 1 24); do
+              if curl -fsS "$healthcheck_url" >/dev/null; then
+                exit 0
+              fi
+
+              sleep 5
+            done
+
+            echo "Health check failed: $healthcheck_url" >&2
+            docker compose --env-file .env -f compose.prod.yaml ps >&2
+            exit 1

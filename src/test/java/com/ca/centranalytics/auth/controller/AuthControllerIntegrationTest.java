@@ -194,6 +194,13 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
+    void testActuatorHealth_WithoutToken_Success() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void testProtectedRoot_WithMalformedToken_ReturnsJsonUnauthorized() throws Exception {
         mockMvc.perform(get("/")
                         .header("Authorization", "Bearer invalid.token.here"))
