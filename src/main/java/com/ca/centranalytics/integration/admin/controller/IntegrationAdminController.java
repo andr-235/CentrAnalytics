@@ -8,10 +8,15 @@ import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsReq
 import com.ca.centranalytics.integration.channel.vk.api.EnrichVkUsersRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
+import com.ca.centranalytics.integration.channel.vk.api.VkCommentSnapshotResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobStatusResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkGroupCandidateResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkUserCandidateResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkWallPostSnapshotResponse;
 import com.ca.centranalytics.integration.channel.telegram.service.TelegramWebhookRegistrationService;
 import com.ca.centranalytics.integration.channel.vk.service.VkCrawlCommandService;
+import com.ca.centranalytics.integration.channel.vk.service.VkDiscoveryQueryService;
 import com.ca.centranalytics.integration.channel.vk.service.VkJobQueryService;
 import com.ca.centranalytics.integration.channel.vk.service.VkWebhookRegistrationService;
 import jakarta.validation.Valid;
@@ -20,7 +25,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -31,6 +39,7 @@ public class IntegrationAdminController {
     private final TelegramWebhookRegistrationService telegramWebhookRegistrationService;
     private final VkCrawlCommandService vkCrawlCommandService;
     private final VkJobQueryService vkJobQueryService;
+    private final VkDiscoveryQueryService vkDiscoveryQueryService;
 
     @GetMapping("/api/raw-events/{id}")
     public RawEventResponse getRawEvent(@PathVariable Long id) {
@@ -78,5 +87,28 @@ public class IntegrationAdminController {
     @GetMapping("/api/admin/integrations/vk/jobs/{jobId}")
     public VkCrawlJobStatusResponse getVkJob(@PathVariable Long jobId) {
         return vkJobQueryService.getJob(jobId);
+    }
+
+    @GetMapping("/api/admin/integrations/vk/groups")
+    public List<VkGroupCandidateResponse> getVkGroups(@RequestParam(required = false) String search) {
+        return vkDiscoveryQueryService.getGroups(search);
+    }
+
+    @GetMapping("/api/admin/integrations/vk/users")
+    public List<VkUserCandidateResponse> getVkUsers(@RequestParam(required = false) String search) {
+        return vkDiscoveryQueryService.getUsers(search);
+    }
+
+    @GetMapping("/api/admin/integrations/vk/groups/{groupId}/posts")
+    public List<VkWallPostSnapshotResponse> getVkGroupPosts(@PathVariable Long groupId) {
+        return vkDiscoveryQueryService.getGroupPosts(groupId);
+    }
+
+    @GetMapping("/api/admin/integrations/vk/posts/{postId}/comments")
+    public List<VkCommentSnapshotResponse> getVkPostComments(
+            @PathVariable Long postId,
+            @RequestParam Long ownerId
+    ) {
+        return vkDiscoveryQueryService.getPostComments(ownerId, postId);
     }
 }

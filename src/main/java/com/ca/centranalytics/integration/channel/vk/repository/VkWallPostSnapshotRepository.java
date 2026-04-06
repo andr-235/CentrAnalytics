@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface VkWallPostSnapshotRepository extends JpaRepository<VkWallPostSnapshot, Long> {
     Optional<VkWallPostSnapshot> findByOwnerIdAndPostId(Long ownerId, Long postId);
     List<VkWallPostSnapshot> findAllByPostIdIn(List<Long> postIds);
+    List<VkWallPostSnapshot> findAllByOwnerIdOrderByUpdatedAtDesc(Long ownerId);
 }

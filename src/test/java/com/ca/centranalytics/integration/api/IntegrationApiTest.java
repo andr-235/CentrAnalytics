@@ -7,10 +7,20 @@ import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
+import com.ca.centranalytics.integration.channel.vk.domain.VkCollectionMethod;
+import com.ca.centranalytics.integration.channel.vk.domain.VkCommentSnapshot;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJob;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobType;
+import com.ca.centranalytics.integration.channel.vk.domain.VkGroupCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
+import com.ca.centranalytics.integration.channel.vk.domain.VkUserCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkWallPostSnapshot;
+import com.ca.centranalytics.integration.channel.vk.repository.VkCommentSnapshotRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkCrawlJobRepository;
+import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
+import com.ca.centranalytics.integration.channel.vk.repository.VkUserCandidateRepository;
+import com.ca.centranalytics.integration.channel.vk.repository.VkWallPostSnapshotRepository;
 import com.ca.centranalytics.integration.domain.entity.Conversation;
 import com.ca.centranalytics.integration.domain.entity.ConversationType;
 import com.ca.centranalytics.integration.domain.entity.ExternalUser;
@@ -75,6 +85,18 @@ class IntegrationApiTest {
     @Autowired
     private VkCrawlJobRepository vkCrawlJobRepository;
 
+    @Autowired
+    private VkGroupCandidateRepository vkGroupCandidateRepository;
+
+    @Autowired
+    private VkUserCandidateRepository vkUserCandidateRepository;
+
+    @Autowired
+    private VkWallPostSnapshotRepository vkWallPostSnapshotRepository;
+
+    @Autowired
+    private VkCommentSnapshotRepository vkCommentSnapshotRepository;
+
     private Long messageId;
     private Long rawEventId;
     private Long vkCrawlJobId;
@@ -82,6 +104,10 @@ class IntegrationApiTest {
     @BeforeEach
     void setUp() {
         vkCrawlJobRepository.deleteAll();
+        vkCommentSnapshotRepository.deleteAll();
+        vkWallPostSnapshotRepository.deleteAll();
+        vkUserCandidateRepository.deleteAll();
+        vkGroupCandidateRepository.deleteAll();
         messageRepository.deleteAll();
         rawEventRepository.deleteAll();
         conversationRepository.deleteAll();
@@ -147,6 +173,57 @@ class IntegrationApiTest {
                 .processedCount(10)
                 .warningCount(1)
                 .build()).getId();
+
+        vkGroupCandidateRepository.save(VkGroupCandidate.builder()
+                .vkGroupId(1001L)
+                .source(source)
+                .screenName("primorye_group")
+                .name("Primorye Group")
+                .regionMatchSource(VkMatchSource.STRUCTURED)
+                .collectionMethod(VkCollectionMethod.OFFICIAL_API)
+                .rawJson("{\"id\":1001}")
+                .build());
+
+        vkUserCandidateRepository.save(VkUserCandidate.builder()
+                .vkUserId(2002L)
+                .source(source)
+                .displayName("Ivan Ivanov")
+                .firstName("Ivan")
+                .lastName("Ivanov")
+                .username("id2002")
+                .profileUrl("https://vk.com/id2002")
+                .city("Primorsky Krai")
+                .homeTown("Vladivostok")
+                .birthDate("10.10.1990")
+                .sex(2)
+                .status("online")
+                .mobilePhone("+79990000001")
+                .education("FEFU")
+                .regionMatchSource(VkMatchSource.TEXT)
+                .collectionMethod(VkCollectionMethod.OFFICIAL_API)
+                .rawJson("{\"id\":2002}")
+                .build());
+
+        vkWallPostSnapshotRepository.save(VkWallPostSnapshot.builder()
+                .ownerId(-1001L)
+                .postId(3003L)
+                .source(source)
+                .authorVkUserId(2002L)
+                .text("Hello from Primorye")
+                .collectionMethod(VkCollectionMethod.OFFICIAL_API)
+                .rawJson("{\"owner_id\":-1001,\"id\":3003}")
+                .build());
+
+        vkCommentSnapshotRepository.save(VkCommentSnapshot.builder()
+                .ownerId(-1001L)
+                .postId(3003L)
+                .commentId(4004L)
+                .source(source)
+                .authorVkUserId(2002L)
+                .text("Great post")
+                .collectionMethod(VkCollectionMethod.OFFICIAL_API)
+                .rawJson("{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}")
+                .build());
     }
 
     @Test
@@ -227,6 +304,28 @@ class IntegrationApiTest {
                 .andExpect(jsonPath("$.status").value("RUNNING"))
                 .andExpect(jsonPath("$.processedCount").value(10))
                 .andExpect(jsonPath("$.warningCount").value(1));
+
+        mockMvc.perform(get("/api/admin/integrations/vk/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vkGroupId").value(1001))
+                .andExpect(jsonPath("$[0].screenName").value("primorye_group"));
+
+        mockMvc.perform(get("/api/admin/integrations/vk/users").param("search", "ivan"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vkUserId").value(2002))
+                .andExpect(jsonPath("$[0].username").value("id2002"))
+                .andExpect(jsonPath("$[0].education").value("FEFU"));
+
+        mockMvc.perform(get("/api/admin/integrations/vk/groups/{groupId}/posts", 1001L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].postId").value(3003))
+                .andExpect(jsonPath("$[0].authorVkUserId").value(2002));
+
+        mockMvc.perform(get("/api/admin/integrations/vk/posts/{postId}/comments", 3003L)
+                        .param("ownerId", "-1001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].commentId").value(4004))
+                .andExpect(jsonPath("$[0].text").value("Great post"));
     }
 
     @Test
