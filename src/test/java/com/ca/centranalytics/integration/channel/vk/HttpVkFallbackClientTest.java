@@ -44,6 +44,17 @@ class HttpVkFallbackClientTest {
                   </body>
                 </html>
                 """));
+        server.createContext("/public1002", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <div class="post" data-post-id="-1002_5005">
+                      <a class="post_author" href="/id2004">Anna Smirnova</a>
+                      <div class="post_text">Alt layout post text</div>
+                      <span data-time="1770000000"></span>
+                    </div>
+                  </body>
+                </html>
+                """));
         server.createContext("/wall-1001_3003", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -51,6 +62,17 @@ class HttpVkFallbackClientTest {
                       <a class="reply_author" href="/id3003">Petr Petrov</a>
                       <div class="reply_text">Great post</div>
                       <time datetime="2026-04-06T01:00:00Z"></time>
+                    </div>
+                  </body>
+                </html>
+                """));
+        server.createContext("/wall-1002_5005", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <div class="wall_reply" data-reply-id="7007">
+                      <a class="wall_reply_author" href="/id2004">Anna Smirnova</a>
+                      <div class="wall_reply_text">Alt reply text</div>
+                      <span data-time="1770003600"></span>
                     </div>
                   </body>
                 </html>
@@ -86,6 +108,45 @@ class HttpVkFallbackClientTest {
                     <div class="profile_info_row">
                       <div class="label">Город:</div>
                       <div class="value">Artem</div>
+                    </div>
+                  </body>
+                </html>
+                """));
+        server.createContext("/id2004", exchange -> respond(exchange, """
+                <html>
+                  <head>
+                    <meta property="og:image" content="https://vk.com/images/2004.jpg" />
+                  </head>
+                  <body>
+                    <h1>Anna Smirnova</h1>
+                    <div class="profile_status">active</div>
+                    <div class="profile_info_row">
+                      <div class="label">Город:</div>
+                      <div class="value">Ussuriysk</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Дата рождения:</div>
+                      <div class="value">01.01.1995</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Пол:</div>
+                      <div class="value">женский</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Сайт:</div>
+                      <div class="value">https://anna.example.com</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Моб. телефон:</div>
+                      <div class="value">+79990000004</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Дом. телефон:</div>
+                      <div class="value">84232000004</div>
+                    </div>
+                    <div class="profile_info_row">
+                      <div class="label">Образование:</div>
+                      <div class="value">VGUES</div>
                     </div>
                   </body>
                 </html>
@@ -155,6 +216,39 @@ class HttpVkFallbackClientTest {
         assertThat(users).extracting(user -> user.birthDate()).containsExactly("10.10.1990", null);
         assertThat(users).extracting(user -> user.status()).containsExactly("online", null);
         assertThat(users).extracting(user -> user.avatarUrl()).containsExactly("https://vk.com/images/2002.jpg", null);
+    }
+
+    @Test
+    void parsesAlternativeMarkupAndRicherProfileFields() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), properties());
+
+        var posts = client.getGroupPosts(1002L, 10);
+        var comments = client.getPostComments(-1002L, 5005L, 10);
+        var users = client.getUsersByIds(List.of(2004L));
+
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(5005L);
+            assertThat(post.authorVkUserId()).isEqualTo(2004L);
+            assertThat(post.text()).isEqualTo("Alt layout post text");
+            assertThat(post.createdAt()).isEqualTo(Instant.ofEpochSecond(1770000000));
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(7007L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2004L);
+            assertThat(comment.text()).isEqualTo("Alt reply text");
+            assertThat(comment.createdAt()).isEqualTo(Instant.ofEpochSecond(1770003600));
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Anna Smirnova");
+            assertThat(user.city()).isEqualTo("Ussuriysk");
+            assertThat(user.birthDate()).isEqualTo("01.01.1995");
+            assertThat(user.sex()).isEqualTo(1);
+            assertThat(user.site()).isEqualTo("https://anna.example.com");
+            assertThat(user.mobilePhone()).isEqualTo("+79990000004");
+            assertThat(user.homePhone()).isEqualTo("84232000004");
+            assertThat(user.education()).isEqualTo("VGUES");
+            assertThat(user.avatarUrl()).isEqualTo("https://vk.com/images/2004.jpg");
+        });
     }
 
     private VkProperties properties() {

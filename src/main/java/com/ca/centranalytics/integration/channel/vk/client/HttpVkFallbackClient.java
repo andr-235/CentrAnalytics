@@ -135,15 +135,23 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             if (postId == null) {
                 continue;
             }
+            String authorHref = firstNonBlank(
+                    extractHref(post, ".post_author, .wall_post_author"),
+                    extractHref(post, "a[href^=/id]")
+            );
             results.add(new VkWallPostResult(
                     parseOwnerId(post.attr("data-post-id"), groupId),
                     postId,
-                    parseLong(post.attr("data-from-id")),
+                    firstNonNull(
+                            parseLong(post.attr("data-from-id")),
+                            parseUserId(authorHref)
+                    ),
                     text(post, ".wall_post_text, .post_text, .pi_text"),
-                    parseTime(post.selectFirst("time")),
+                    parseTime(firstNonNullElement(post.selectFirst("time"), post.selectFirst("[data-time]"))),
                     rawJson(rawPayload(
                             "postId", postId,
-                            "ownerId", parseOwnerId(post.attr("data-post-id"), groupId)
+                            "ownerId", parseOwnerId(post.attr("data-post-id"), groupId),
+                            "authorHref", authorHref
                     ))
             ));
         }
@@ -169,7 +177,7 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     commentId,
                     parseUserId(href),
                     text(reply, ".reply_text, .wall_reply_text"),
-                    parseTime(reply.selectFirst("time")),
+                    parseTime(firstNonNullElement(reply.selectFirst("time"), reply.selectFirst("[data-time]"))),
                     rawJson(rawPayload(
                             "commentId", commentId,
                             "authorHref", href
@@ -203,15 +211,19 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     profileField(document, "Город:"),
                     profileField(document, "Родной город:"),
                     profileField(document, "Дата рождения:"),
-                    null,
+                    parseSex(profileField(document, "Пол:")),
                     text(document, ".profile_status"),
                     null,
-                    firstNonBlank(attr(document, ".page_avatar_img, img.page_avatar_img", "src"), extractJsonLdValue(document, "image")),
+                    firstNonBlank(
+                            attr(document, ".page_avatar_img, img.page_avatar_img", "src"),
+                            attr(document, "meta[property=og:image]", "content"),
+                            extractJsonLdValue(document, "image")
+                    ),
+                    profileField(document, "Моб. телефон:"),
+                    profileField(document, "Дом. телефон:"),
+                    profileField(document, "Сайт:"),
                     null,
-                    null,
-                    null,
-                    null,
-                    null,
+                    profileField(document, "Образование:"),
                     null,
                     null,
                     rawJson(rawPayload(
@@ -372,6 +384,24 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         if (StringUtils.hasText(dateTime)) {
             return OffsetDateTime.parse(dateTime).toInstant();
         }
+        String unixTime = element.attr("data-time");
+        if (StringUtils.hasText(unixTime)) {
+            return Instant.ofEpochSecond(Long.parseLong(unixTime));
+        }
+        return null;
+    }
+
+    private Integer parseSex(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase();
+        if (normalized.startsWith("жен")) {
+            return 1;
+        }
+        if (normalized.startsWith("муж")) {
+            return 2;
+        }
         return null;
     }
 
@@ -406,6 +436,24 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         for (String value : values) {
             if (StringUtils.hasText(value)) {
                 return value;
+            }
+        }
+        return null;
+    }
+
+    private Long firstNonNull(Long... values) {
+        for (Long value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Element firstNonNullElement(Element... elements) {
+        for (Element element : elements) {
+            if (element != null) {
+                return element;
             }
         }
         return null;
