@@ -5,11 +5,9 @@ import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-@Service
 public class NoopVkFallbackClient implements VkFallbackClient {
 
     @Override

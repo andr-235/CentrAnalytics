@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.vk.webhook-path=/api/integrations/webhooks/vk",
         "integration.vk.api-version=5.199",
         "integration.vk.api-base-url=https://api.vk.com/method",
+        "integration.vk.fallback-base-url=https://vk.com",
         "integration.vk.request-timeout=5s",
         "integration.telegram.bot-token=tg-token",
         "integration.telegram.webhook-secret=tg-secret",
@@ -60,6 +61,7 @@ class IntegrationPropertiesTest {
         assertThat(vkProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/vk");
         assertThat(vkProperties.apiVersion()).isEqualTo("5.199");
         assertThat(vkProperties.apiBaseUrl()).isEqualTo("https://api.vk.com/method");
+        assertThat(vkProperties.fallbackBaseUrl()).isEqualTo("https://vk.com");
         assertThat(vkProperties.requestTimeout()).isEqualTo(Duration.ofSeconds(5));
 
         assertThat(telegramProperties.botToken()).isEqualTo("tg-token");

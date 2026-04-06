@@ -112,6 +112,7 @@ class HttpVkOfficialClientTest {
                 "/api/integrations/webhooks/vk",
                 "5.199",
                 apiBaseUrl,
+                "https://vk.com",
                 Duration.ofSeconds(5)
         );
     }

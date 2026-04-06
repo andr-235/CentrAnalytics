@@ -14,6 +14,7 @@ public record VkProperties(
         String webhookPath,
         String apiVersion,
         String apiBaseUrl,
+        String fallbackBaseUrl,
         Duration requestTimeout
 ) {
 }
