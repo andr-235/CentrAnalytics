@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.TestPropertySource;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = IntegrationPropertiesTest.TestConfig.class)
@@ -18,7 +20,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.vk.secret=vk-secret",
         "integration.vk.confirmation-code=vk-confirm",
         "integration.vk.access-token=vk-token",
+        "integration.vk.user-access-token=vk-user-token",
         "integration.vk.webhook-path=/api/integrations/webhooks/vk",
+        "integration.vk.api-version=5.199",
+        "integration.vk.api-base-url=https://api.vk.com/method",
+        "integration.vk.request-timeout=5s",
         "integration.telegram.bot-token=tg-token",
         "integration.telegram.webhook-secret=tg-secret",
         "integration.telegram.webhook-path=/api/integrations/webhooks/telegram/tg-token",
@@ -50,7 +56,11 @@ class IntegrationPropertiesTest {
         assertThat(vkProperties.secret()).isEqualTo("vk-secret");
         assertThat(vkProperties.confirmationCode()).isEqualTo("vk-confirm");
         assertThat(vkProperties.accessToken()).isEqualTo("vk-token");
+        assertThat(vkProperties.userAccessToken()).isEqualTo("vk-user-token");
         assertThat(vkProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/vk");
+        assertThat(vkProperties.apiVersion()).isEqualTo("5.199");
+        assertThat(vkProperties.apiBaseUrl()).isEqualTo("https://api.vk.com/method");
+        assertThat(vkProperties.requestTimeout()).isEqualTo(Duration.ofSeconds(5));
 
         assertThat(telegramProperties.botToken()).isEqualTo("tg-token");
         assertThat(telegramProperties.webhookSecret()).isEqualTo("tg-secret");

@@ -3,9 +3,20 @@ package com.ca.centranalytics.integration.admin.controller;
 import com.ca.centranalytics.integration.api.dto.RawEventResponse;
 import com.ca.centranalytics.integration.api.dto.WebhookRegistrationResponse;
 import com.ca.centranalytics.integration.api.service.IntegrationQueryService;
+import com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest;
+import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsRequest;
+import com.ca.centranalytics.integration.channel.vk.api.EnrichVkUsersRequest;
+import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
+import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
+import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobStatusResponse;
 import com.ca.centranalytics.integration.channel.telegram.service.TelegramWebhookRegistrationService;
+import com.ca.centranalytics.integration.channel.vk.service.VkCrawlCommandService;
+import com.ca.centranalytics.integration.channel.vk.service.VkJobQueryService;
 import com.ca.centranalytics.integration.channel.vk.service.VkWebhookRegistrationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +29,8 @@ public class IntegrationAdminController {
     private final IntegrationQueryService integrationQueryService;
     private final VkWebhookRegistrationService vkWebhookRegistrationService;
     private final TelegramWebhookRegistrationService telegramWebhookRegistrationService;
+    private final VkCrawlCommandService vkCrawlCommandService;
+    private final VkJobQueryService vkJobQueryService;
 
     @GetMapping("/api/raw-events/{id}")
     public RawEventResponse getRawEvent(@PathVariable Long id) {
@@ -32,5 +45,38 @@ public class IntegrationAdminController {
     @PostMapping("/api/admin/integrations/telegram/register-webhook")
     public WebhookRegistrationResponse registerTelegramWebhook() {
         return telegramWebhookRegistrationService.registerWebhook();
+    }
+
+    @PostMapping("/api/admin/integrations/vk/groups/search")
+    public VkCrawlJobResponse searchVkGroups(@Valid @RequestBody SearchVkGroupsRequest request) {
+        return vkCrawlCommandService.createGroupSearchJob(request);
+    }
+
+    @PostMapping("/api/admin/integrations/vk/users/search")
+    public VkCrawlJobResponse searchVkUsers(@Valid @RequestBody SearchVkUsersRequest request) {
+        return vkCrawlCommandService.createUserSearchJob(request);
+    }
+
+    @PostMapping("/api/admin/integrations/vk/groups/{groupId}/posts/collect")
+    public VkCrawlJobResponse collectVkGroupPosts(
+            @PathVariable Long groupId,
+            @Valid @RequestBody CollectVkGroupPostsRequest request
+    ) {
+        return vkCrawlCommandService.createGroupPostsJob(groupId, request);
+    }
+
+    @PostMapping("/api/admin/integrations/vk/posts/comments/collect")
+    public VkCrawlJobResponse collectVkPostComments(@Valid @RequestBody CollectVkPostCommentsRequest request) {
+        return vkCrawlCommandService.createPostCommentsJob(request);
+    }
+
+    @PostMapping("/api/admin/integrations/vk/users/enrich")
+    public VkCrawlJobResponse enrichVkUsers(@Valid @RequestBody EnrichVkUsersRequest request) {
+        return vkCrawlCommandService.createUserEnrichmentJob(request);
+    }
+
+    @GetMapping("/api/admin/integrations/vk/jobs/{jobId}")
+    public VkCrawlJobStatusResponse getVkJob(@PathVariable Long jobId) {
+        return vkJobQueryService.getJob(jobId);
     }
 }

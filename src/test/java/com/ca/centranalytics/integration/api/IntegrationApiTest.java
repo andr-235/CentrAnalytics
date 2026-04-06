@@ -1,6 +1,10 @@
 package com.ca.centranalytics.integration.api;
 
 import com.ca.centranalytics.TestcontainersConfiguration;
+import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJob;
+import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
+import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobType;
+import com.ca.centranalytics.integration.channel.vk.repository.VkCrawlJobRepository;
 import com.ca.centranalytics.integration.domain.entity.Conversation;
 import com.ca.centranalytics.integration.domain.entity.ConversationType;
 import com.ca.centranalytics.integration.domain.entity.ExternalUser;
@@ -28,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -57,11 +62,16 @@ class IntegrationApiTest {
     @Autowired
     private MessageRepository messageRepository;
 
+    @Autowired
+    private VkCrawlJobRepository vkCrawlJobRepository;
+
     private Long messageId;
     private Long rawEventId;
+    private Long vkCrawlJobId;
 
     @BeforeEach
     void setUp() {
+        vkCrawlJobRepository.deleteAll();
         messageRepository.deleteAll();
         rawEventRepository.deleteAll();
         conversationRepository.deleteAll();
@@ -77,6 +87,7 @@ class IntegrationApiTest {
 
         ExternalUser author = externalUserRepository.save(ExternalUser.builder()
                 .platform(Platform.VK)
+                .source(source)
                 .externalUserId("123")
                 .displayName("Ivan Ivanov")
                 .username("ivan")
@@ -118,6 +129,14 @@ class IntegrationApiTest {
 
         this.messageId = message.getId();
         this.rawEventId = rawEvent.getId();
+        this.vkCrawlJobId = vkCrawlJobRepository.save(VkCrawlJob.builder()
+                .jobType(VkCrawlJobType.GROUP_SEARCH)
+                .status(VkCrawlJobStatus.RUNNING)
+                .requestJson("{\"region\":\"Primorsky Krai\",\"limit\":25}")
+                .itemCount(25)
+                .processedCount(10)
+                .warningCount(1)
+                .build()).getId();
     }
 
     @Test
@@ -131,7 +150,8 @@ class IntegrationApiTest {
     void returnsReadApiDataForAuthenticatedUser() throws Exception {
         mockMvc.perform(get("/api/integrations"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].platform").value("VK"));
+                .andExpect(jsonPath("$[0].platform").value("VK"))
+                .andExpect(jsonPath("$[0].settingsJson").doesNotExist());
 
         mockMvc.perform(get("/api/messages").param("search", "hello"))
                 .andExpect(status().isOk())
@@ -152,6 +172,24 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/register-webhook"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.platform").value("VK"));
+
+        mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"region":"Primorsky Krai","limit":25,"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"))
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.id").isNumber());
+
+        mockMvc.perform(get("/api/admin/integrations/vk/jobs/{jobId}", vkCrawlJobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(vkCrawlJobId))
+                .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"))
+                .andExpect(jsonPath("$.status").value("RUNNING"))
+                .andExpect(jsonPath("$.processedCount").value(10))
+                .andExpect(jsonPath("$.warningCount").value(1));
     }
 
     @Test
@@ -159,5 +197,18 @@ class IntegrationApiTest {
     void forbidsAdminEndpointsForNonAdmins() throws Exception {
         mockMvc.perform(get("/api/raw-events/{id}", rawEventId))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void validatesVkGroupSearchPayload() throws Exception {
+        mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"region":"","limit":0,"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.region").exists())
+                .andExpect(jsonPath("$.limit").exists());
     }
 }
