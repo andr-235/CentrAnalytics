@@ -36,6 +36,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/lenient/search", this::respondSearch);
         server.createContext("/commented/search", this::respondSearch);
         server.createContext("/jsonparse/search", this::respondSearch);
+        server.createContext("/datablob/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -216,6 +217,13 @@ class HttpVkFallbackClientTest {
                     <script>
                       window.__initialState = JSON.parse("{\"posts\":[{\"post_id\":9022,\"owner_id\":-1011,\"from_id\":2011,\"text\":\"Post from json parse payload\",\"created_at\":\"2026-04-07T12:00:00Z\"}]}");
                     </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/datablob/public1012", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <div id="page_wall_posts" data-state="{&quot;posts&quot;:[{&quot;post_id&quot;:9024,&quot;owner_id&quot;:-1012,&quot;from_id&quot;:2012,&quot;text&quot;:&quot;Post from data blob payload&quot;,&quot;created_at&quot;:&quot;2026-04-07T14:00:00Z&quot;}]}"></div>
                   </body>
                 </html>
                 """));
@@ -402,6 +410,13 @@ class HttpVkFallbackClientTest {
                     <script>
                       window.__initialState = JSON.parse("{\"comments\":[{\"comment_id\":9023,\"post_id\":9022,\"owner_id\":-1011,\"from_id\":2011,\"text\":\"Comment from json parse payload\",\"created_at\":\"2026-04-07T13:00:00Z\"}]}");
                     </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/datablob/wall-1012_9024", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <div id="replies" data-comments="{&quot;comments&quot;:[{&quot;comment_id&quot;:9025,&quot;post_id&quot;:9024,&quot;owner_id&quot;:-1012,&quot;from_id&quot;:2012,&quot;text&quot;:&quot;Comment from data blob payload&quot;,&quot;created_at&quot;:&quot;2026-04-07T15:00:00Z&quot;}]}"></div>
                   </body>
                 </html>
                 """));
@@ -673,6 +688,13 @@ class HttpVkFallbackClientTest {
                     <script>
                       window.__initialState = JSON.parse("{\"profile\":{\"id\":2011,\"display_name\":\"Roman JsonParse\",\"username\":\"id2011\",\"city\":\"Dalnegorsk\",\"home_town\":\"Kavalerovo\",\"birth_date\":\"11.10.1998\",\"sex\":2,\"status\":\"json parse status\",\"avatar_url\":\"https://vk.com/images/2011.jpg\",\"mobile_phone\":\"+79990000011\",\"home_phone\":\"84232000011\",\"site\":\"https://roman.example.com\",\"education\":\"FEFU\"}}");
                     </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/datablob/id2012", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <div id="profile_root" data-profile="{&quot;profile&quot;:{&quot;id&quot;:2012,&quot;display_name&quot;:&quot;Svetlana DataBlob&quot;,&quot;username&quot;:&quot;id2012&quot;,&quot;city&quot;:&quot;Artem&quot;,&quot;home_town&quot;:&quot;Nadezhdinskoye&quot;,&quot;birth_date&quot;:&quot;12.10.1999&quot;,&quot;sex&quot;:1,&quot;status&quot;:&quot;data blob status&quot;,&quot;avatar_url&quot;:&quot;https://vk.com/images/2012.jpg&quot;,&quot;mobile_phone&quot;:&quot;+79990000012&quot;,&quot;home_phone&quot;:&quot;84232000012&quot;,&quot;site&quot;:&quot;https://svetlana.example.com&quot;,&quot;education&quot;:&quot;TGEU&quot;}}"></div>
                   </body>
                 </html>
                 """));
@@ -1077,6 +1099,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromHtmlDataBlobs() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), dataBlobProperties());
+
+        var groups = client.searchGroups("DataBlob Region", 10);
+        var users = client.searchUsers("DataBlob Region", 10);
+        var posts = client.getGroupPosts(1012L, 10);
+        var comments = client.getPostComments(-1012L, 9024L, 10);
+        var profiles = client.getUsersByIds(List.of(2012L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1012L);
+            assertThat(group.name()).isEqualTo("DataBlob Group");
+            assertThat(group.screenName()).isEqualTo("club1012");
+            assertThat(group.city()).isEqualTo("Artem");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2012L);
+            assertThat(user.displayName()).isEqualTo("Svetlana DataBlob");
+            assertThat(user.username()).isEqualTo("id2012");
+            assertThat(user.city()).isEqualTo("Artem");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9024L);
+            assertThat(post.authorVkUserId()).isEqualTo(2012L);
+            assertThat(post.text()).isEqualTo("Post from data blob payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9025L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2012L);
+            assertThat(comment.text()).isEqualTo("Comment from data blob payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Svetlana DataBlob");
+            assertThat(user.homeTown()).isEqualTo("Nadezhdinskoye");
+            assertThat(user.birthDate()).isEqualTo("12.10.1999");
+            assertThat(user.sex()).isEqualTo(1);
+            assertThat(user.status()).isEqualTo("data blob status");
+            assertThat(user.site()).isEqualTo("https://svetlana.example.com");
+            assertThat(user.education()).isEqualTo("TGEU");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -1193,6 +1258,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/jsonparse",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties dataBlobProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/datablob",
                 Duration.ofSeconds(5)
         );
     }
@@ -1430,6 +1510,16 @@ class HttpVkFallbackClientTest {
                         <script>
                           window.__initialState = JSON.parse("{\"groups\":[{\"id\":1011,\"name\":\"JsonParse Group\",\"screen_name\":\"club1011\",\"description\":\"Search group from json parse payload\",\"city\":\"Dalnegorsk\"}],\"users\":[{\"id\":2011,\"display_name\":\"Roman JsonParse\",\"first_name\":\"Roman\",\"last_name\":\"JsonParse\",\"username\":\"id2011\",\"city\":\"Dalnegorsk\",\"home_town\":\"Kavalerovo\",\"avatar_url\":\"https://vk.com/images/2011.jpg\"}]}");
                         </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/datablob")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <div id="search_root" data-store="{&quot;groups&quot;:[{&quot;id&quot;:1012,&quot;name&quot;:&quot;DataBlob Group&quot;,&quot;screen_name&quot;:&quot;club1012&quot;,&quot;description&quot;:&quot;Search group from data blob payload&quot;,&quot;city&quot;:&quot;Artem&quot;}],&quot;users&quot;:[{&quot;id&quot;:2012,&quot;display_name&quot;:&quot;Svetlana DataBlob&quot;,&quot;first_name&quot;:&quot;Svetlana&quot;,&quot;last_name&quot;:&quot;DataBlob&quot;,&quot;username&quot;:&quot;id2012&quot;,&quot;city&quot;:&quot;Artem&quot;,&quot;home_town&quot;:&quot;Nadezhdinskoye&quot;,&quot;avatar_url&quot;:&quot;https://vk.com/images/2012.jpg&quot;}]}"></div>
                       </body>
                     </html>
                     """);

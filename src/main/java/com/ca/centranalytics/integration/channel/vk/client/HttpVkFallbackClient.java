@@ -669,19 +669,28 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         Set<String> seenPayloads = new LinkedHashSet<>();
         for (Element script : document.select("script")) {
             for (String candidate : scriptPayloadCandidates(script)) {
-                if (!StringUtils.hasText(candidate) || !seenPayloads.add(candidate)) {
-                    continue;
-                }
-                try {
-                    JsonNode payload = objectMapper.readTree(candidate);
-                    if (payload != null && !payload.isNull()) {
-                        payloads.add(payload);
-                    }
-                } catch (JsonProcessingException ignored) {
-                }
+                addPayloadCandidate(payloads, seenPayloads, candidate);
+            }
+        }
+        for (Element element : document.select("[data-store], [data-state], [data-payload], [data-profile], [data-comments], [data-json], [data-init]")) {
+            for (String candidate : elementPayloadCandidates(element)) {
+                addPayloadCandidate(payloads, seenPayloads, candidate);
             }
         }
         return payloads;
+    }
+
+    private void addPayloadCandidate(List<JsonNode> payloads, Set<String> seenPayloads, String candidate) {
+        if (!StringUtils.hasText(candidate) || !seenPayloads.add(candidate)) {
+            return;
+        }
+        try {
+            JsonNode payload = objectMapper.readTree(candidate);
+            if (payload != null && !payload.isNull()) {
+                payloads.add(payload);
+            }
+        } catch (JsonProcessingException ignored) {
+        }
     }
 
     private List<String> scriptPayloadCandidates(Element script) {
@@ -703,6 +712,51 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             }
         }
         return candidates;
+    }
+
+    private List<String> elementPayloadCandidates(Element element) {
+        List<String> candidates = new ArrayList<>();
+        for (org.jsoup.nodes.Attribute attribute : element.attributes()) {
+            if (!attribute.getKey().startsWith("data-")) {
+                continue;
+            }
+            addPayloadCandidates(candidates, attribute.getValue());
+        }
+        return candidates;
+    }
+
+    private void addPayloadCandidates(List<String> candidates, String rawValue) {
+        if (!StringUtils.hasText(rawValue)) {
+            return;
+        }
+        String value = rawValue.trim();
+        if (!StringUtils.hasText(value)) {
+            return;
+        }
+        if (looksLikeJson(value)) {
+            candidates.add(value);
+        }
+        String normalized = normalizeJsLikeObject(value);
+        if (StringUtils.hasText(normalized) && !normalized.equals(value) && looksLikeJson(normalized)) {
+            candidates.add(normalized);
+        }
+        String inlineObject = extractInlineJsonObject(value);
+        if (StringUtils.hasText(inlineObject)) {
+            candidates.add(inlineObject);
+            String normalizedInline = normalizeJsLikeObject(inlineObject);
+            if (StringUtils.hasText(normalizedInline) && !normalizedInline.equals(inlineObject)) {
+                candidates.add(normalizedInline);
+            }
+        }
+    }
+
+    private boolean looksLikeJson(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return (trimmed.startsWith("{") && trimmed.endsWith("}"))
+                || (trimmed.startsWith("[") && trimmed.endsWith("]"));
     }
 
     private String normalizeJsLikeObject(String payload) {
