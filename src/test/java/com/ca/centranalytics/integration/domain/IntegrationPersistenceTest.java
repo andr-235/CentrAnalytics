@@ -36,8 +36,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +84,9 @@ class IntegrationPersistenceTest {
 
     @Autowired
     private VkCommentSnapshotRepository vkCommentSnapshotRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void persistsCoreIntegrationEntities() {
@@ -144,213 +151,225 @@ class IntegrationPersistenceTest {
     @Test
     void persistsVkDiscoveryEntitiesAndRejectsDuplicates() {
         Instant now = Instant.parse("2026-04-06T00:00:00Z");
+        Timestamp timestamp = Timestamp.from(now);
+        try {
+            inNewTransaction(() -> {
+                jdbcTemplate.update("""
+                                insert into vk_crawl_job (
+                                    job_type,
+                                    status,
+                                    request_json,
+                                    created_at,
+                                    updated_at
+                                ) values (?, ?, ?, ?, ?)
+                                """,
+                        "GROUP_SEARCH",
+                        "COMPLETED",
+                        "{\"region\":\"Primorsky Krai\"}",
+                        timestamp,
+                        timestamp);
 
-        jdbcTemplate.update("""
-                        insert into vk_crawl_job (
-                            job_type,
-                            status,
-                            request_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?)
-                        """,
-                "GROUP_SEARCH",
-                "COMPLETED",
-                "{\"region\":\"Primorsky Krai\"}",
-                now,
-                now);
+                jdbcTemplate.update("""
+                                insert into vk_group_candidate (
+                                    vk_group_id,
+                                    screen_name,
+                                    name,
+                                    region_match_source,
+                                    collection_method,
+                                    raw_json,
+                                    created_at,
+                                    updated_at
+                                ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                        1001L,
+                        "primorye_group",
+                        "Primorye Group",
+                        "STRUCTURED",
+                        "OFFICIAL_API",
+                        "{\"id\":1001,\"name\":\"Primorye Group\"}",
+                        timestamp,
+                        timestamp);
 
-        jdbcTemplate.update("""
-                        insert into vk_group_candidate (
-                            vk_group_id,
-                            screen_name,
-                            name,
-                            region_match_source,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                1001L,
-                "primorye_group",
-                "Primorye Group",
-                "STRUCTURED",
-                "OFFICIAL_API",
-                "{\"id\":1001,\"name\":\"Primorye Group\"}",
-                now,
-                now);
+                jdbcTemplate.update("""
+                                insert into vk_user_candidate (
+                                    vk_user_id,
+                                    display_name,
+                                    profile_url,
+                                    region_match_source,
+                                    collection_method,
+                                    raw_json,
+                                    created_at,
+                                    updated_at
+                                ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                        2002L,
+                        "Ivan Ivanov",
+                        "https://vk.com/id2002",
+                        "TEXT",
+                        "FALLBACK",
+                        "{\"id\":2002,\"first_name\":\"Ivan\",\"last_name\":\"Ivanov\"}",
+                        timestamp,
+                        timestamp);
 
-        jdbcTemplate.update("""
-                        insert into vk_user_candidate (
-                            vk_user_id,
-                            display_name,
-                            profile_url,
-                            region_match_source,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                2002L,
-                "Ivan Ivanov",
-                "https://vk.com/id2002",
-                "TEXT",
-                "FALLBACK",
-                "{\"id\":2002,\"first_name\":\"Ivan\",\"last_name\":\"Ivanov\"}",
-                now,
-                now);
+                jdbcTemplate.update("""
+                                insert into vk_wall_post_snapshot (
+                                    owner_id,
+                                    post_id,
+                                    author_vk_user_id,
+                                    text,
+                                    collection_method,
+                                    raw_json,
+                                    created_at,
+                                    updated_at
+                                ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                        -1001L,
+                        3003L,
+                        2002L,
+                        "Hello from Primorye",
+                        "OFFICIAL_API",
+                        "{\"owner_id\":-1001,\"id\":3003}",
+                        timestamp,
+                        timestamp);
 
-        jdbcTemplate.update("""
-                        insert into vk_wall_post_snapshot (
-                            owner_id,
-                            post_id,
-                            author_vk_user_id,
-                            text,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                -1001L,
-                3003L,
-                2002L,
-                "Hello from Primorye",
-                "OFFICIAL_API",
-                "{\"owner_id\":-1001,\"id\":3003}",
-                now,
-                now);
+                jdbcTemplate.update("""
+                                insert into vk_comment_snapshot (
+                                    owner_id,
+                                    post_id,
+                                    comment_id,
+                                    author_vk_user_id,
+                                    text,
+                                    collection_method,
+                                    raw_json,
+                                    created_at,
+                                    updated_at
+                                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                        -1001L,
+                        3003L,
+                        4004L,
+                        2002L,
+                        "Great post",
+                        "OFFICIAL_API",
+                        "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}",
+                        timestamp,
+                        timestamp);
+            });
 
-        jdbcTemplate.update("""
-                        insert into vk_comment_snapshot (
-                            owner_id,
-                            post_id,
-                            comment_id,
-                            author_vk_user_id,
-                            text,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                -1001L,
-                3003L,
-                4004L,
-                2002L,
-                "Great post",
-                "OFFICIAL_API",
-                "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}",
-                now,
-                now);
+            assertThat(inNewTransaction(() -> jdbcTemplate.queryForObject(
+                    "select count(*) from vk_crawl_job where source_id is null",
+                    Long.class))).isEqualTo(1L);
+            assertThat(inNewTransaction(() -> jdbcTemplate.queryForObject(
+                    "select count(*) from vk_group_candidate where source_id is null",
+                    Long.class))).isEqualTo(1L);
+            assertThat(inNewTransaction(() -> jdbcTemplate.queryForObject(
+                    "select count(*) from vk_user_candidate where source_id is null",
+                    Long.class))).isEqualTo(1L);
+            assertThat(inNewTransaction(() -> jdbcTemplate.queryForObject(
+                    "select count(*) from vk_wall_post_snapshot where source_id is null",
+                    Long.class))).isEqualTo(1L);
+            assertThat(inNewTransaction(() -> jdbcTemplate.queryForObject(
+                    "select count(*) from vk_comment_snapshot where source_id is null",
+                    Long.class))).isEqualTo(1L);
 
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from vk_crawl_job where source_id is null",
-                Long.class)).isEqualTo(1L);
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from vk_group_candidate where source_id is null",
-                Long.class)).isEqualTo(1L);
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from vk_user_candidate where source_id is null",
-                Long.class)).isEqualTo(1L);
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from vk_wall_post_snapshot where source_id is null",
-                Long.class)).isEqualTo(1L);
-        assertThat(jdbcTemplate.queryForObject(
-                "select count(*) from vk_comment_snapshot where source_id is null",
-                Long.class)).isEqualTo(1L);
+            assertThatThrownBy(() -> inNewTransaction(() -> jdbcTemplate.update("""
+                            insert into vk_group_candidate (
+                                vk_group_id,
+                                screen_name,
+                                name,
+                                region_match_source,
+                                collection_method,
+                                raw_json,
+                                created_at,
+                                updated_at
+                            ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                    1001L,
+                    "primorye_group_dup",
+                    "Primorye Group Duplicate",
+                    "TEXT",
+                    "FALLBACK",
+                    "{\"id\":1001,\"name\":\"Primorye Group Duplicate\"}",
+                    timestamp,
+                    timestamp)))
+                    .isInstanceOf(DuplicateKeyException.class);
 
-        assertThatThrownBy(() -> jdbcTemplate.update("""
-                        insert into vk_group_candidate (
-                            vk_group_id,
-                            screen_name,
-                            name,
-                            region_match_source,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                1001L,
-                "primorye_group_dup",
-                "Primorye Group Duplicate",
-                "TEXT",
-                "FALLBACK",
-                "{\"id\":1001,\"name\":\"Primorye Group Duplicate\"}",
-                now,
-                now))
-                .isInstanceOf(DuplicateKeyException.class);
+            assertThatThrownBy(() -> inNewTransaction(() -> jdbcTemplate.update("""
+                            insert into vk_user_candidate (
+                                vk_user_id,
+                                display_name,
+                                profile_url,
+                                region_match_source,
+                                collection_method,
+                                raw_json,
+                                created_at,
+                                updated_at
+                            ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                    2002L,
+                    "Ivan Ivanov Duplicate",
+                    "https://vk.com/id2002",
+                    "TEXT",
+                    "OFFICIAL_API",
+                    "{\"id\":2002,\"first_name\":\"Ivan\",\"last_name\":\"Ivanov\"}",
+                    timestamp,
+                    timestamp)))
+                    .isInstanceOf(DuplicateKeyException.class);
 
-        assertThatThrownBy(() -> jdbcTemplate.update("""
-                        insert into vk_user_candidate (
-                            vk_user_id,
-                            display_name,
-                            profile_url,
-                            region_match_source,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                2002L,
-                "Ivan Ivanov Duplicate",
-                "https://vk.com/id2002",
-                "TEXT",
-                "OFFICIAL_API",
-                "{\"id\":2002,\"first_name\":\"Ivan\",\"last_name\":\"Ivanov\"}",
-                now,
-                now))
-                .isInstanceOf(DuplicateKeyException.class);
+            assertThatThrownBy(() -> inNewTransaction(() -> jdbcTemplate.update("""
+                            insert into vk_wall_post_snapshot (
+                                owner_id,
+                                post_id,
+                                author_vk_user_id,
+                                text,
+                                collection_method,
+                                raw_json,
+                                created_at,
+                                updated_at
+                            ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                    -1001L,
+                    3003L,
+                    2002L,
+                    "Hello from Primorye duplicate",
+                    "FALLBACK",
+                    "{\"owner_id\":-1001,\"id\":3003}",
+                    timestamp,
+                    timestamp)))
+                    .isInstanceOf(DuplicateKeyException.class);
 
-        assertThatThrownBy(() -> jdbcTemplate.update("""
-                        insert into vk_wall_post_snapshot (
-                            owner_id,
-                            post_id,
-                            author_vk_user_id,
-                            text,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                -1001L,
-                3003L,
-                2002L,
-                "Hello from Primorye duplicate",
-                "FALLBACK",
-                "{\"owner_id\":-1001,\"id\":3003}",
-                now,
-                now))
-                .isInstanceOf(DuplicateKeyException.class);
-
-        assertThatThrownBy(() -> jdbcTemplate.update("""
-                        insert into vk_comment_snapshot (
-                            owner_id,
-                            post_id,
-                            comment_id,
-                            author_vk_user_id,
-                            text,
-                            collection_method,
-                            raw_json,
-                            created_at,
-                            updated_at
-                        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                -1001L,
-                3003L,
-                4004L,
-                2002L,
-                "Great post duplicate",
-                "FALLBACK",
-                "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}",
-                now,
-                now))
-                .isInstanceOf(DuplicateKeyException.class);
+            assertThatThrownBy(() -> inNewTransaction(() -> jdbcTemplate.update("""
+                            insert into vk_comment_snapshot (
+                                owner_id,
+                                post_id,
+                                comment_id,
+                                author_vk_user_id,
+                                text,
+                                collection_method,
+                                raw_json,
+                                created_at,
+                                updated_at
+                            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                    -1001L,
+                    3003L,
+                    4004L,
+                    2002L,
+                    "Great post duplicate",
+                    "FALLBACK",
+                    "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}",
+                    timestamp,
+                    timestamp)))
+                    .isInstanceOf(DuplicateKeyException.class);
+        } finally {
+            inNewTransaction(() -> {
+                jdbcTemplate.update("delete from vk_comment_snapshot");
+                jdbcTemplate.update("delete from vk_wall_post_snapshot");
+                jdbcTemplate.update("delete from vk_user_candidate");
+                jdbcTemplate.update("delete from vk_group_candidate");
+                jdbcTemplate.update("delete from vk_crawl_job");
+            });
+        }
     }
 
     @Test
@@ -411,5 +430,17 @@ class IntegrationPersistenceTest {
         assertThat(vkUserCandidateRepository.findByVkUserId(2002L)).isPresent();
         assertThat(vkWallPostSnapshotRepository.findByOwnerIdAndPostId(-1001L, 3003L)).isPresent();
         assertThat(vkCommentSnapshotRepository.findByOwnerIdAndPostIdAndCommentId(-1001L, 3003L, 4004L)).isPresent();
+    }
+
+    private void inNewTransaction(Runnable action) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        template.executeWithoutResult(status -> action.run());
+    }
+
+    private <T> T inNewTransaction(java.util.function.Supplier<T> supplier) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template.execute(status -> supplier.get());
     }
 }

@@ -1,5 +1,6 @@
 package com.ca.centranalytics.integration.channel.vk;
 
+import com.ca.centranalytics.TestcontainersConfiguration;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
 import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-@Import(VkDiscoveryOrchestratorTest.TestConfig.class)
+@Import({TestcontainersConfiguration.class, VkDiscoveryOrchestratorTest.TestConfig.class})
 class VkDiscoveryOrchestratorTest {
 
     @Autowired
