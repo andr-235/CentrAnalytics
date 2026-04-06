@@ -71,8 +71,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             return results;
         }
         for (JsonNode payload : scriptPayloads(document)) {
-            JsonNode groupsNode = payload.path("groups");
-            if (!groupsNode.isArray()) {
+            JsonNode groupsNode = findArrayField(payload, "groups");
+            if (groupsNode == null) {
                 continue;
             }
             for (JsonNode group : groupsNode) {
@@ -153,8 +153,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             return results;
         }
         for (JsonNode payload : scriptPayloads(document)) {
-            JsonNode usersNode = payload.path("users");
-            if (!usersNode.isArray()) {
+            JsonNode usersNode = findArrayField(payload, "users");
+            if (usersNode == null) {
                 continue;
             }
             for (JsonNode user : usersNode) {
@@ -232,8 +232,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             return results;
         }
         for (JsonNode payload : scriptPayloads(document)) {
-            JsonNode postsNode = payload.path("posts");
-            if (!postsNode.isArray()) {
+            JsonNode postsNode = findArrayField(payload, "posts");
+            if (postsNode == null) {
                 continue;
             }
             for (JsonNode post : postsNode) {
@@ -287,8 +287,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             return results;
         }
         for (JsonNode payload : scriptPayloads(document)) {
-            JsonNode commentsNode = payload.path("comments");
-            if (!commentsNode.isArray()) {
+            JsonNode commentsNode = findArrayField(payload, "comments");
+            if (commentsNode == null) {
                 continue;
             }
             for (JsonNode comment : commentsNode) {
@@ -395,8 +395,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
 
     private VkUserSearchResult scriptProfileResult(Document document, Long userId) {
         for (JsonNode payload : scriptPayloads(document)) {
-            JsonNode profile = payload.path("profile");
-            if (profile.isMissingNode() || profile.isNull()) {
+            JsonNode profile = findObjectField(payload, "profile");
+            if (profile == null) {
                 continue;
             }
             String displayName = textValue(profile, "display_name");
@@ -425,6 +425,45 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     jsonValue(profile, "counters"),
                     rawJson(profile)
             );
+        }
+        return null;
+    }
+
+    private JsonNode findArrayField(JsonNode node, String fieldName) {
+        return findField(node, fieldName, JsonNode::isArray);
+    }
+
+    private JsonNode findObjectField(JsonNode node, String fieldName) {
+        return findField(node, fieldName, JsonNode::isObject);
+    }
+
+    private JsonNode findField(JsonNode node, String fieldName, java.util.function.Predicate<JsonNode> matcher) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        JsonNode direct = node.path(fieldName);
+        if (!direct.isMissingNode() && !direct.isNull() && matcher.test(direct)) {
+            return direct;
+        }
+        if (node.isObject()) {
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                JsonNode nested = findField(entry.getValue(), fieldName, matcher);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+            return null;
+        }
+        if (!node.isArray()) {
+            return null;
+        }
+        for (JsonNode item : node) {
+            JsonNode nested = findField(item, fieldName, matcher);
+            if (nested != null) {
+                return nested;
+            }
         }
         return null;
     }

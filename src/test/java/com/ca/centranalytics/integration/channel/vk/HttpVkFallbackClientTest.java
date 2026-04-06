@@ -31,6 +31,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/search", this::respondSearch);
         server.createContext("/script/search", this::respondSearch);
         server.createContext("/inline/search", this::respondSearch);
+        server.createContext("/nested/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -114,6 +115,31 @@ class HttpVkFallbackClientTest {
                   </body>
                 </html>
                 """));
+        server.createContext("/nested/public1005", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "payload": {
+                          "feed": {
+                            "items": {
+                              "posts": [
+                                {
+                                  "post_id": 9013,
+                                  "owner_id": -1005,
+                                  "from_id": 2007,
+                                  "text": "Post from nested payload",
+                                  "created_at": "2026-04-07T04:00:00Z"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
         server.createContext("/wall-1001_3003", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -191,6 +217,32 @@ class HttpVkFallbackClientTest {
                             "created_at": "2026-04-07T03:00:00Z"
                           }
                         ]
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/nested/wall-1005_9013", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "payload": {
+                          "commentsBlock": {
+                            "items": {
+                              "comments": [
+                                {
+                                  "comment_id": 9014,
+                                  "post_id": 9013,
+                                  "owner_id": -1005,
+                                  "from_id": 2007,
+                                  "text": "Comment from nested payload",
+                                  "created_at": "2026-04-07T05:00:00Z"
+                                }
+                              ]
+                            }
+                          }
+                        }
                       };
                     </script>
                   </body>
@@ -339,6 +391,35 @@ class HttpVkFallbackClientTest {
                           "home_phone": "84232000006",
                           "site": "https://olga.example.com",
                           "education": "MГУ"
+                        }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/nested/id2007", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "state": {
+                          "entities": {
+                            "profile": {
+                              "id": 2007,
+                              "display_name": "Nikita Nested",
+                              "username": "id2007",
+                              "city": "Spassk-Dalny",
+                              "home_town": "Lesozavodsk",
+                              "birth_date": "07.07.1994",
+                              "sex": 2,
+                              "status": "nested status",
+                              "avatar_url": "https://vk.com/images/2007.jpg",
+                              "mobile_phone": "+79990000007",
+                              "home_phone": "84232000007",
+                              "site": "https://nikita.example.com",
+                              "education": "FEFU"
+                            }
+                          }
                         }
                       };
                     </script>
@@ -531,6 +612,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromNestedPayloadWrappers() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), nestedProperties());
+
+        var groups = client.searchGroups("Nested Region", 10);
+        var users = client.searchUsers("Nested Region", 10);
+        var posts = client.getGroupPosts(1005L, 10);
+        var comments = client.getPostComments(-1005L, 9013L, 10);
+        var profiles = client.getUsersByIds(List.of(2007L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1005L);
+            assertThat(group.name()).isEqualTo("Nested Group");
+            assertThat(group.screenName()).isEqualTo("club1005");
+            assertThat(group.city()).isEqualTo("Spassk-Dalny");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2007L);
+            assertThat(user.displayName()).isEqualTo("Nikita Nested");
+            assertThat(user.username()).isEqualTo("id2007");
+            assertThat(user.city()).isEqualTo("Spassk-Dalny");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9013L);
+            assertThat(post.authorVkUserId()).isEqualTo(2007L);
+            assertThat(post.text()).isEqualTo("Post from nested payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9014L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2007L);
+            assertThat(comment.text()).isEqualTo("Comment from nested payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Nikita Nested");
+            assertThat(user.homeTown()).isEqualTo("Lesozavodsk");
+            assertThat(user.birthDate()).isEqualTo("07.07.1994");
+            assertThat(user.sex()).isEqualTo(2);
+            assertThat(user.status()).isEqualTo("nested status");
+            assertThat(user.site()).isEqualTo("https://nikita.example.com");
+            assertThat(user.education()).isEqualTo("FEFU");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -572,6 +696,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/inline",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties nestedProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/nested",
                 Duration.ofSeconds(5)
         );
     }
@@ -639,6 +778,48 @@ class HttpVkFallbackClientTest {
                                 "avatar_url": "https://vk.com/images/2006.jpg"
                               }
                             ]
+                          };
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/nested")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = {
+                            "payload": {
+                              "search": {
+                                "result": {
+                                  "items": {
+                                    "groups": [
+                                      {
+                                        "id": 1005,
+                                        "name": "Nested Group",
+                                        "screen_name": "club1005",
+                                        "description": "Search group from nested payload",
+                                        "city": "Spassk-Dalny"
+                                      }
+                                    ],
+                                    "users": [
+                                      {
+                                        "id": 2007,
+                                        "display_name": "Nikita Nested",
+                                        "first_name": "Nikita",
+                                        "last_name": "Nested",
+                                        "username": "id2007",
+                                        "city": "Spassk-Dalny",
+                                        "home_town": "Lesozavodsk",
+                                        "avatar_url": "https://vk.com/images/2007.jpg"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
                           };
                         </script>
                       </body>
