@@ -1,6 +1,12 @@
 package com.ca.centranalytics.integration.api;
 
 import com.ca.centranalytics.TestcontainersConfiguration;
+import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
+import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJob;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobType;
@@ -24,13 +30,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,7 +48,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, IntegrationApiTest.TestConfig.class})
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -237,5 +247,111 @@ class IntegrationApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.region").exists())
                 .andExpect(jsonPath("$.limit").exists());
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+
+        @Bean
+        @Primary
+        VkOfficialClient vkOfficialClient() {
+            return new VkOfficialClient() {
+                @Override
+                public List<VkGroupSearchResult> searchGroups(String region, int limit) {
+                    return List.of(new VkGroupSearchResult(
+                            1001L,
+                            "Primorye Group",
+                            "primorye_group",
+                            "News from Primorsky Krai",
+                            "Vladivostok",
+                            "{\"id\":1001}"
+                    ));
+                }
+
+                @Override
+                public List<VkUserSearchResult> searchUsers(String region, int limit) {
+                    return List.of(new VkUserSearchResult(
+                            2002L,
+                            "Ivan Ivanov",
+                            "Ivan",
+                            "Ivanov",
+                            "https://vk.com/id2002",
+                            "Primorsky Krai",
+                            "{\"id\":2002}"
+                    ));
+                }
+
+                @Override
+                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+                    return List.of(new VkWallPostResult(
+                            -groupId,
+                            3003L,
+                            2002L,
+                            "Hello from Primorye",
+                            Instant.parse("2026-04-06T00:00:00Z"),
+                            "{\"owner_id\":-" + groupId + ",\"id\":3003}"
+                    ));
+                }
+
+                @Override
+                public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
+                    return List.of(new VkCommentResult(
+                            ownerId,
+                            postId,
+                            4004L,
+                            2002L,
+                            "Great post",
+                            Instant.parse("2026-04-06T00:05:00Z"),
+                            "{\"owner_id\":" + ownerId + ",\"post_id\":" + postId + ",\"id\":4004}"
+                    ));
+                }
+
+                @Override
+                public List<VkUserSearchResult> getUsersByIds(List<Long> userIds) {
+                    return userIds.stream()
+                            .map(userId -> new VkUserSearchResult(
+                                    userId,
+                                    userId.equals(2002L) ? "Ivan Ivanov" : "Petr Petrov",
+                                    userId.equals(2002L) ? "Ivan" : "Petr",
+                                    userId.equals(2002L) ? "Ivanov" : "Petrov",
+                                    "https://vk.com/id" + userId,
+                                    "Primorsky Krai",
+                                    "{\"id\":" + userId + "}"
+                            ))
+                            .toList();
+                }
+            };
+        }
+
+        @Bean
+        @Primary
+        VkFallbackClient vkFallbackClient() {
+            return new VkFallbackClient() {
+                @Override
+                public List<VkGroupSearchResult> searchGroups(String region, int limit) {
+                    return List.of();
+                }
+
+                @Override
+                public List<VkUserSearchResult> searchUsers(String region, int limit) {
+                    return List.of();
+                }
+
+                @Override
+                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+                    return List.of();
+                }
+
+                @Override
+                public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
+                    return List.of();
+                }
+
+                @Override
+                public List<VkUserSearchResult> getUsersByIds(List<Long> userIds) {
+                    return List.of();
+                }
+            };
+        }
     }
 }
