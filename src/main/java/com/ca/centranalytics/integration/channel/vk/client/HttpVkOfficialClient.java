@@ -5,123 +5,105 @@ import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResu
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import com.vk.api.sdk.client.ClientResponse;
+import com.vk.api.sdk.client.TransportClient;
+import com.vk.api.sdk.client.VkApiClient;
+import com.vk.api.sdk.client.actors.UserActor;
+import com.vk.api.sdk.exceptions.ApiException;
+import com.vk.api.sdk.exceptions.ClientException;
+import com.vk.api.sdk.httpclient.HttpTransportClient;
+import com.vk.api.sdk.objects.groups.GroupFull;
+import com.vk.api.sdk.objects.groups.SearchType;
+import com.vk.api.sdk.objects.groups.responses.SearchResponse;
+import com.vk.api.sdk.objects.users.Fields;
+import com.vk.api.sdk.objects.users.UserFull;
+import com.vk.api.sdk.objects.users.responses.GetResponse;
+import com.vk.api.sdk.objects.wall.WallComment;
+import com.vk.api.sdk.objects.wall.WallItem;
+import com.vk.api.sdk.objects.wall.responses.GetCommentsResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
 
-import java.net.http.HttpClient;
+import java.io.IOException;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.StreamSupport;
 
 @Service
 public class HttpVkOfficialClient implements VkOfficialClient {
 
-    private static final String DEFAULT_API_BASE_URL = "https://api.vk.com/method";
-    private static final String DEFAULT_API_VERSION = "5.199";
+    private static final long SDK_ACTOR_ID = 1L;
 
-    private final RestClient restClient;
     private final VkProperties vkProperties;
-    private final ObjectMapper objectMapper;
+    private final VkApiClient vkApiClient;
 
-    public HttpVkOfficialClient(RestClient.Builder restClientBuilder, VkProperties vkProperties, ObjectMapper objectMapper) {
+    @Autowired
+    public HttpVkOfficialClient(VkProperties vkProperties) {
+        this(vkProperties, new VkApiClient(new ConfigurableTransportClient(vkProperties)));
+    }
+
+    public static HttpVkOfficialClient withVkApiClient(VkProperties vkProperties, VkApiClient vkApiClient) {
+        return new HttpVkOfficialClient(vkProperties, vkApiClient);
+    }
+
+    HttpVkOfficialClient(VkProperties vkProperties, VkApiClient vkApiClient) {
         this.vkProperties = vkProperties;
-        this.objectMapper = objectMapper;
-        java.time.Duration requestTimeout = vkProperties.requestTimeout() == null ? java.time.Duration.ofSeconds(5) : vkProperties.requestTimeout();
-        String apiBaseUrl = StringUtils.hasText(vkProperties.apiBaseUrl()) ? vkProperties.apiBaseUrl() : DEFAULT_API_BASE_URL;
-
-        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder()
-                        .connectTimeout(requestTimeout)
-                        .build()
-        );
-        requestFactory.setReadTimeout(requestTimeout);
-
-        this.restClient = restClientBuilder
-                .baseUrl(apiBaseUrl)
-                .requestFactory(requestFactory)
-                .build();
+        this.vkApiClient = vkApiClient;
     }
 
     @Override
     public List<VkGroupSearchResult> searchGroups(String region, int limit) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("q", region);
-        params.put("type", "group");
-        params.put("count", limit);
-        params.put("fields", "description,city");
+        SearchResponse response = execute(() -> vkApiClient.groups()
+                .search(userActorForOfficialCalls(), region)
+                .type(SearchType.GROUP)
+                .count(limit)
+                .execute());
 
-        JsonNode items = invokeItemsMethod("groups.search", officialAccessToken(), params);
-
-        return StreamSupport.stream(items.spliterator(), false)
-                .map(item -> new VkGroupSearchResult(
-                        item.path("id").asLong(),
-                        text(item, "name"),
-                        text(item, "screen_name"),
-                        text(item, "description"),
-                        nestedText(item, "city", "title"),
-                        writeValue(item)
-                ))
+        return response.getItems().stream()
+                .map(this::toGroupResult)
                 .toList();
     }
 
     @Override
     public List<VkUserSearchResult> searchUsers(String region, int limit) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("q", region);
-        params.put("count", limit);
-        params.put("fields", userFields());
+        com.vk.api.sdk.objects.users.responses.SearchResponse response = execute(() -> vkApiClient.users()
+                .search(userActorForUserCalls())
+                .q(region)
+                .count(limit)
+                .fields(userFields())
+                .execute());
 
-        JsonNode items = invokeItemsMethod("users.search", userAccessToken(), params);
-        return StreamSupport.stream(items.spliterator(), false)
+        return response.getItems().stream()
                 .map(this::toUserResult)
                 .toList();
     }
 
     @Override
     public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("owner_id", -Math.abs(groupId));
-        params.put("count", limit);
+        com.vk.api.sdk.objects.wall.responses.GetResponse response = execute(() -> vkApiClient.wall()
+                .get(userActorForOfficialCalls())
+                .unsafeParam("owner_id", -Math.abs(groupId))
+                .count(limit)
+                .execute());
 
-        JsonNode items = invokeItemsMethod("wall.get", officialAccessToken(), params);
-        return StreamSupport.stream(items.spliterator(), false)
-                .map(item -> new VkWallPostResult(
-                        item.path("owner_id").asLong(),
-                        item.path("id").asLong(),
-                        positiveOrNull(item.path("from_id").asLong()),
-                        text(item, "text"),
-                        parseUnixTimestamp(item.path("date")),
-                        writeValue(item)
-                ))
+        return response.getItems().stream()
+                .map(this::toWallPostResult)
                 .toList();
     }
 
     @Override
     public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("owner_id", ownerId);
-        params.put("post_id", postId);
-        params.put("count", limit);
-        params.put("thread_items_count", 0);
+        GetCommentsResponse response = execute(() -> vkApiClient.wall()
+                .getComments(userActorForOfficialCalls())
+                .ownerId(ownerId)
+                .postId(postId.intValue())
+                .count(limit)
+                .threadItemsCount(0)
+                .execute());
 
-        JsonNode items = invokeItemsMethod("wall.getComments", officialAccessToken(), params);
-        return StreamSupport.stream(items.spliterator(), false)
-                .map(item -> new VkCommentResult(
-                        ownerId,
-                        postId,
-                        item.path("id").asLong(),
-                        positiveOrNull(item.path("from_id").asLong()),
-                        text(item, "text"),
-                        parseUnixTimestamp(item.path("date")),
-                        writeValue(item)
-                ))
+        return response.getItems().stream()
+                .map(this::toCommentResult)
                 .toList();
     }
 
@@ -131,80 +113,89 @@ public class HttpVkOfficialClient implements VkOfficialClient {
             return List.of();
         }
 
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put("user_ids", userIds.stream().map(String::valueOf).reduce((left, right) -> left + "," + right).orElse(""));
-        params.put("fields", userFields());
+        List<GetResponse> response = execute(() -> vkApiClient.users()
+                .get(userActorForUserCalls())
+                .userIds(userIds.stream().map(String::valueOf).toList())
+                .fields(userFields())
+                .execute());
 
-        JsonNode response = invokeMethod("users.get", userAccessToken(), params);
-        return StreamSupport.stream(response.spliterator(), false)
+        return response.stream()
                 .map(this::toUserResult)
                 .toList();
     }
 
-    private VkUserSearchResult toUserResult(JsonNode item) {
-        long userId = item.path("id").asLong();
-        String firstName = text(item, "first_name");
-        String lastName = text(item, "last_name");
-        String screenName = firstNonBlank(text(item, "screen_name"), text(item, "domain"));
-        String profileUrl = "https://vk.com/" + firstNonBlank(screenName, "id" + userId);
-        String displayName = firstNonBlank(
-                text(item, "display_name"),
-                joinNonBlank(firstName, lastName)
+    private VkGroupSearchResult toGroupResult(GroupFull group) {
+        return new VkGroupSearchResult(
+                group.getId(),
+                group.getName(),
+                group.getScreenName(),
+                group.getDescription(),
+                group.getCity() != null ? group.getCity().getTitle() : null,
+                vkApiClient.getGson().toJson(group)
         );
-        String city = nestedText(item, "city", "title");
-        String homeTown = text(item, "home_town");
-        String education = firstNonBlank(text(item, "university_name"), text(item, "faculty_name"));
+    }
+
+    private VkUserSearchResult toUserResult(UserFull user) {
+        long userId = user.getId();
+        String screenName = firstNonBlank(user.getScreenName(), user.getDomain());
+        String profileUrl = "https://vk.com/" + firstNonBlank(screenName, "id" + userId);
+        String displayName = firstNonBlank(user.getNickname(), joinNonBlank(user.getFirstName(), user.getLastName()));
+        String education = firstNonBlank(user.getUniversityName(), user.getFacultyName());
 
         return new VkUserSearchResult(
                 userId,
                 displayName,
-                firstName,
-                lastName,
+                user.getFirstName(),
+                user.getLastName(),
                 screenName,
                 profileUrl,
-                city,
-                homeTown,
-                text(item, "bdate"),
-                integerOrNull(item.path("sex")),
-                text(item, "status"),
-                parseUnixTimestamp(item.path("last_seen").path("time")),
-                text(item, "photo_200"),
-                text(item, "mobile_phone"),
-                text(item, "home_phone"),
-                text(item, "site"),
-                integerOrNull(item.path("relation")),
+                user.getCity() != null ? user.getCity().getTitle() : null,
+                user.getHomeTown(),
+                user.getBdate(),
+                user.getSex() != null ? user.getSex().getValue() : null,
+                user.getStatus(),
+                user.getLastSeen() != null && user.getLastSeen().getTime() != null ? Instant.ofEpochSecond(user.getLastSeen().getTime()) : null,
+                user.getPhoto200() != null ? user.getPhoto200().toString() : null,
+                user.getMobilePhone(),
+                user.getHomePhone(),
+                user.getSite(),
+                user.getRelation() != null ? user.getRelation().getValue() : null,
                 education,
-                writeStructuredValue(item.path("career")),
-                writeStructuredValue(item.path("counters")),
-                writeValue(item)
+                user.getCareer() != null ? vkApiClient.getGson().toJson(user.getCareer()) : null,
+                user.getCounters() != null ? vkApiClient.getGson().toJson(user.getCounters()) : null,
+                vkApiClient.getGson().toJson(user)
         );
     }
 
-    private JsonNode invokeItemsMethod(String methodName, String accessToken, Map<String, Object> params) {
-        JsonNode response = invokeMethod(methodName, accessToken, params);
-        return response.path("items").isArray() ? response.path("items") : objectMapper.createArrayNode();
+    private VkWallPostResult toWallPostResult(WallItem item) {
+        return new VkWallPostResult(
+                item.getOwnerId(),
+                Long.valueOf(item.getId()),
+                positiveOrNull(item.getFromId()),
+                item.getText(),
+                parseUnixTimestamp(item.getDate()),
+                vkApiClient.getGson().toJson(item)
+        );
     }
 
-    private JsonNode invokeMethod(String methodName, String accessToken, Map<String, Object> params) {
-        String body = restClient.get()
-                .uri(uriBuilder -> {
-                    var builder = uriBuilder.pathSegment(methodName)
-                            .queryParam("access_token", accessToken)
-                            .queryParam("v", apiVersion());
-                    params.forEach(builder::queryParam);
-                    return builder.build();
-                })
-                .retrieve()
-                .body(String.class);
+    private VkCommentResult toCommentResult(WallComment comment) {
+        return new VkCommentResult(
+                comment.getOwnerId(),
+                comment.getPostId().longValue(),
+                comment.getId().longValue(),
+                positiveOrNull(comment.getFromId()),
+                comment.getText(),
+                parseUnixTimestamp(comment.getDate()),
+                vkApiClient.getGson().toJson(comment)
+        );
+    }
 
-        if (!StringUtils.hasText(body)) {
-            throw new IllegalStateException("VK API returned empty body for " + methodName);
-        }
-        JsonNode root = readTree(body);
-        if (root.has("error")) {
-            throw new IllegalStateException("VK API error for " + methodName + ": " + writeValue(root.path("error")));
-        }
-        return root.path("response");
+    private UserActor userActorForOfficialCalls() {
+        return new UserActor(SDK_ACTOR_ID, officialAccessToken());
+    }
+
+    private UserActor userActorForUserCalls() {
+        return new UserActor(SDK_ACTOR_ID, userAccessToken());
     }
 
     private String officialAccessToken() {
@@ -218,25 +209,32 @@ public class HttpVkOfficialClient implements VkOfficialClient {
         return StringUtils.hasText(vkProperties.userAccessToken()) ? vkProperties.userAccessToken() : officialAccessToken();
     }
 
-    private String userFields() {
-        return "city,home_town,screen_name,domain,bdate,sex,status,last_seen,photo_200,contacts,connections,career,education,relation,counters";
+    private Fields[] userFields() {
+        return new Fields[]{
+                Fields.CITY,
+                Fields.HOME_TOWN,
+                Fields.SCREEN_NAME,
+                Fields.DOMAIN,
+                Fields.BDATE,
+                Fields.SEX,
+                Fields.STATUS,
+                Fields.LAST_SEEN,
+                Fields.PHOTO_200,
+                Fields.CONTACTS,
+                Fields.CONNECTIONS,
+                Fields.CAREER,
+                Fields.EDUCATION,
+                Fields.RELATION,
+                Fields.COUNTERS
+        };
     }
 
-    private String apiVersion() {
-        return StringUtils.hasText(vkProperties.apiVersion()) ? vkProperties.apiVersion() : DEFAULT_API_VERSION;
-    }
-
-    private String text(JsonNode node, String fieldName) {
-        String value = node.path(fieldName).asText(null);
-        return StringUtils.hasText(value) ? value : null;
-    }
-
-    private String nestedText(JsonNode node, String fieldName, String nestedFieldName) {
-        JsonNode nestedNode = node.path(fieldName);
-        if (nestedNode.isMissingNode() || nestedNode.isNull()) {
-            return null;
+    private <T> T execute(VkSdkCall<T> call) {
+        try {
+            return call.execute();
+        } catch (ApiException | ClientException ex) {
+            throw new IllegalStateException("VK SDK call failed", ex);
         }
-        return text(nestedNode, nestedFieldName);
     }
 
     private String firstNonBlank(String... values) {
@@ -254,38 +252,101 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 .toList());
     }
 
-    private Instant parseUnixTimestamp(JsonNode node) {
-        return node.isNumber() ? Instant.ofEpochSecond(node.asLong()) : null;
+    private Instant parseUnixTimestamp(Integer value) {
+        return value != null ? Instant.ofEpochSecond(value) : null;
     }
 
-    private Long positiveOrNull(long value) {
-        return value > 0 ? value : null;
+    private Long positiveOrNull(Long value) {
+        return value != null && value > 0 ? value : null;
     }
 
-    private Integer integerOrNull(JsonNode node) {
-        return node != null && node.isInt() ? node.intValue() : null;
+    @FunctionalInterface
+    private interface VkSdkCall<T> {
+        T execute() throws ApiException, ClientException;
     }
 
-    private String writeValue(JsonNode node) {
-        try {
-            return objectMapper.writeValueAsString(node);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Failed to serialize VK response payload", ex);
+    static final class ConfigurableTransportClient implements TransportClient {
+
+        private final String apiBaseUrl;
+        private final HttpTransportClient delegate;
+
+        ConfigurableTransportClient(VkProperties vkProperties) {
+            this.apiBaseUrl = normalizeApiBaseUrl(vkProperties.apiBaseUrl());
+            this.delegate = HttpTransportClient.getInstance();
         }
-    }
 
-    private String writeStructuredValue(JsonNode node) {
-        if (node == null || node.isMissingNode() || node.isNull()) {
-            return null;
+        @Override
+        public ClientResponse get(String url) throws IOException {
+            return delegate.get(rewriteUrl(url));
         }
-        return writeValue(node);
-    }
 
-    private JsonNode readTree(String body) {
-        try {
-            return objectMapper.readTree(body);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Failed to parse VK response payload", ex);
+        @Override
+        public ClientResponse get(String url, String body) throws IOException {
+            return delegate.get(rewriteUrl(url), body);
+        }
+
+        @Override
+        public ClientResponse get(String url, org.apache.http.Header[] headers) throws IOException {
+            return delegate.get(rewriteUrl(url), headers);
+        }
+
+        @Override
+        public ClientResponse post(String url, String body) throws IOException {
+            return delegate.post(rewriteUrl(url), body);
+        }
+
+        @Override
+        public ClientResponse post(String url, Map<String, java.io.File> files) throws IOException {
+            return delegate.post(rewriteUrl(url), files);
+        }
+
+        @Override
+        public ClientResponse post(String url, String body, String contentType) throws IOException {
+            return delegate.post(rewriteUrl(url), body, contentType);
+        }
+
+        @Override
+        public ClientResponse post(String url) throws IOException {
+            return delegate.post(rewriteUrl(url));
+        }
+
+        @Override
+        public ClientResponse post(String url, String body, org.apache.http.Header[] headers) throws IOException {
+            return delegate.post(rewriteUrl(url), body, headers);
+        }
+
+        @Override
+        public ClientResponse delete(String url) throws IOException {
+            return delegate.delete(rewriteUrl(url));
+        }
+
+        @Override
+        public ClientResponse delete(String url, String body) throws IOException {
+            return delegate.delete(rewriteUrl(url), body);
+        }
+
+        @Override
+        public ClientResponse delete(String url, String body, String contentType) throws IOException {
+            return delegate.delete(rewriteUrl(url), body, contentType);
+        }
+
+        @Override
+        public ClientResponse delete(String url, String body, org.apache.http.Header[] headers) throws IOException {
+            return delegate.delete(rewriteUrl(url), body, headers);
+        }
+
+        private String rewriteUrl(String url) {
+            if (!StringUtils.hasText(apiBaseUrl)) {
+                return url;
+            }
+            return url.replace("https://api.vk.com/method", apiBaseUrl);
+        }
+
+        private static String normalizeApiBaseUrl(String apiBaseUrl) {
+            if (!StringUtils.hasText(apiBaseUrl)) {
+                return null;
+            }
+            return apiBaseUrl.endsWith("/") ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1) : apiBaseUrl;
         }
     }
 }
