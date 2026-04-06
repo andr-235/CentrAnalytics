@@ -35,6 +35,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/mapped/search", this::respondSearch);
         server.createContext("/lenient/search", this::respondSearch);
         server.createContext("/commented/search", this::respondSearch);
+        server.createContext("/jsonparse/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -205,6 +206,15 @@ class HttpVkFallbackClientTest {
                           },
                         ],
                       };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/jsonparse/public1011", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = JSON.parse("{\"posts\":[{\"post_id\":9022,\"owner_id\":-1011,\"from_id\":2011,\"text\":\"Post from json parse payload\",\"created_at\":\"2026-04-07T12:00:00Z\"}]}");
                     </script>
                   </body>
                 </html>
@@ -382,6 +392,15 @@ class HttpVkFallbackClientTest {
                           },
                         ],
                       };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/jsonparse/wall-1011_9022", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = JSON.parse("{\"comments\":[{\"comment_id\":9023,\"post_id\":9022,\"owner_id\":-1011,\"from_id\":2011,\"text\":\"Comment from json parse payload\",\"created_at\":\"2026-04-07T13:00:00Z\"}]}");
                     </script>
                   </body>
                 </html>
@@ -644,6 +663,15 @@ class HttpVkFallbackClientTest {
                           education: 'VGUES', // education info
                         },
                       };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/jsonparse/id2011", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = JSON.parse("{\"profile\":{\"id\":2011,\"display_name\":\"Roman JsonParse\",\"username\":\"id2011\",\"city\":\"Dalnegorsk\",\"home_town\":\"Kavalerovo\",\"birth_date\":\"11.10.1998\",\"sex\":2,\"status\":\"json parse status\",\"avatar_url\":\"https://vk.com/images/2011.jpg\",\"mobile_phone\":\"+79990000011\",\"home_phone\":\"84232000011\",\"site\":\"https://roman.example.com\",\"education\":\"FEFU\"}}");
                     </script>
                   </body>
                 </html>
@@ -1006,6 +1034,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromJsonParsePayloads() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), jsonParseProperties());
+
+        var groups = client.searchGroups("JsonParse Region", 10);
+        var users = client.searchUsers("JsonParse Region", 10);
+        var posts = client.getGroupPosts(1011L, 10);
+        var comments = client.getPostComments(-1011L, 9022L, 10);
+        var profiles = client.getUsersByIds(List.of(2011L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1011L);
+            assertThat(group.name()).isEqualTo("JsonParse Group");
+            assertThat(group.screenName()).isEqualTo("club1011");
+            assertThat(group.city()).isEqualTo("Dalnegorsk");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2011L);
+            assertThat(user.displayName()).isEqualTo("Roman JsonParse");
+            assertThat(user.username()).isEqualTo("id2011");
+            assertThat(user.city()).isEqualTo("Dalnegorsk");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9022L);
+            assertThat(post.authorVkUserId()).isEqualTo(2011L);
+            assertThat(post.text()).isEqualTo("Post from json parse payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9023L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2011L);
+            assertThat(comment.text()).isEqualTo("Comment from json parse payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Roman JsonParse");
+            assertThat(user.homeTown()).isEqualTo("Kavalerovo");
+            assertThat(user.birthDate()).isEqualTo("11.10.1998");
+            assertThat(user.sex()).isEqualTo(2);
+            assertThat(user.status()).isEqualTo("json parse status");
+            assertThat(user.site()).isEqualTo("https://roman.example.com");
+            assertThat(user.education()).isEqualTo("FEFU");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -1107,6 +1178,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/commented",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties jsonParseProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/jsonparse",
                 Duration.ofSeconds(5)
         );
     }
@@ -1331,6 +1417,18 @@ class HttpVkFallbackClientTest {
                               },
                             ],
                           };
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/jsonparse")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = JSON.parse("{\"groups\":[{\"id\":1011,\"name\":\"JsonParse Group\",\"screen_name\":\"club1011\",\"description\":\"Search group from json parse payload\",\"city\":\"Dalnegorsk\"}],\"users\":[{\"id\":2011,\"display_name\":\"Roman JsonParse\",\"first_name\":\"Roman\",\"last_name\":\"JsonParse\",\"username\":\"id2011\",\"city\":\"Dalnegorsk\",\"home_town\":\"Kavalerovo\",\"avatar_url\":\"https://vk.com/images/2011.jpg\"}]}");
                         </script>
                       </body>
                     </html>
