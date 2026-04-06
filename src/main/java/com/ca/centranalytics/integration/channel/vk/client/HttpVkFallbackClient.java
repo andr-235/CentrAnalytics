@@ -24,9 +24,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class HttpVkFallbackClient implements VkFallbackClient {
+
+    private static final Pattern SINGLE_QUOTED_STRING = Pattern.compile("'((?:\\\\.|[^'\\\\])*)'");
+    private static final Pattern TRAILING_COMMA = Pattern.compile(",(?=\\s*[}\\]])");
+    private static final Pattern UNDEFINED_LITERAL = Pattern.compile("(?<![\\w$])undefined(?![\\w$])");
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -690,8 +696,31 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         String inlineObject = extractInlineJsonObject(scriptData);
         if (StringUtils.hasText(inlineObject)) {
             candidates.add(inlineObject);
+            String normalized = normalizeJsLikeObject(inlineObject);
+            if (StringUtils.hasText(normalized) && !normalized.equals(inlineObject)) {
+                candidates.add(normalized);
+            }
         }
         return candidates;
+    }
+
+    private String normalizeJsLikeObject(String payload) {
+        if (!StringUtils.hasText(payload)) {
+            return payload;
+        }
+        String normalized = payload;
+        normalized = UNDEFINED_LITERAL.matcher(normalized).replaceAll("null");
+        normalized = TRAILING_COMMA.matcher(normalized).replaceAll("");
+        Matcher matcher = SINGLE_QUOTED_STRING.matcher(normalized);
+        StringBuffer buffer = new StringBuffer();
+        while (matcher.find()) {
+            String value = matcher.group(1)
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"");
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement("\"" + value + "\""));
+        }
+        matcher.appendTail(buffer);
+        return buffer.toString();
     }
 
     private String extractInlineJsonObject(String scriptData) {

@@ -33,6 +33,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/inline/search", this::respondSearch);
         server.createContext("/nested/search", this::respondSearch);
         server.createContext("/mapped/search", this::respondSearch);
+        server.createContext("/lenient/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -163,6 +164,26 @@ class HttpVkFallbackClientTest {
                             }
                           ]
                         }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/lenient/public1007", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        'posts': [
+                          {
+                            'post_id': 9017,
+                            'owner_id': -1007,
+                            'from_id': 2009,
+                            'text': 'Post from lenient payload',
+                            'created_at': '2026-04-07T08:00:00Z',
+                            'extra': undefined,
+                          },
+                        ],
                       };
                     </script>
                   </body>
@@ -299,6 +320,27 @@ class HttpVkFallbackClientTest {
                             }
                           ]
                         }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/lenient/wall-1007_9017", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        'comments': [
+                          {
+                            'comment_id': 9018,
+                            'post_id': 9017,
+                            'owner_id': -1007,
+                            'from_id': 2009,
+                            'text': 'Comment from lenient payload',
+                            'created_at': '2026-04-07T09:00:00Z',
+                            'unused': undefined,
+                          },
+                        ],
                       };
                     </script>
                   </body>
@@ -510,6 +552,32 @@ class HttpVkFallbackClientTest {
                             }
                           }
                         ]
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/lenient/id2009", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        'profile': {
+                          'id': 2009,
+                          'display_name': 'Irina Lenient',
+                          'username': 'id2009',
+                          'city': 'Arsenyev',
+                          'home_town': 'Kavalerovo',
+                          'birth_date': '09.09.1996',
+                          'sex': 1,
+                          'status': 'lenient status',
+                          'avatar_url': 'https://vk.com/images/2009.jpg',
+                          'mobile_phone': '+79990000009',
+                          'home_phone': '84232000009',
+                          'site': 'https://irina.example.com',
+                          'education': 'DVGTU',
+                          'relation': undefined,
+                        },
                       };
                     </script>
                   </body>
@@ -787,6 +855,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromLenientJsPayloads() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), lenientProperties());
+
+        var groups = client.searchGroups("Lenient Region", 10);
+        var users = client.searchUsers("Lenient Region", 10);
+        var posts = client.getGroupPosts(1007L, 10);
+        var comments = client.getPostComments(-1007L, 9017L, 10);
+        var profiles = client.getUsersByIds(List.of(2009L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1007L);
+            assertThat(group.name()).isEqualTo("Lenient Group");
+            assertThat(group.screenName()).isEqualTo("club1007");
+            assertThat(group.city()).isEqualTo("Arsenyev");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2009L);
+            assertThat(user.displayName()).isEqualTo("Irina Lenient");
+            assertThat(user.username()).isEqualTo("id2009");
+            assertThat(user.city()).isEqualTo("Arsenyev");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9017L);
+            assertThat(post.authorVkUserId()).isEqualTo(2009L);
+            assertThat(post.text()).isEqualTo("Post from lenient payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9018L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2009L);
+            assertThat(comment.text()).isEqualTo("Comment from lenient payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Irina Lenient");
+            assertThat(user.homeTown()).isEqualTo("Kavalerovo");
+            assertThat(user.birthDate()).isEqualTo("09.09.1996");
+            assertThat(user.sex()).isEqualTo(1);
+            assertThat(user.status()).isEqualTo("lenient status");
+            assertThat(user.site()).isEqualTo("https://irina.example.com");
+            assertThat(user.education()).isEqualTo("DVGTU");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -858,6 +969,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/mapped",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties lenientProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/lenient",
                 Duration.ofSeconds(5)
         );
     }
@@ -1012,6 +1138,41 @@ class HttpVkFallbackClientTest {
                                 }
                               ]
                             }
+                          };
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/lenient")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = {
+                            'groups': [
+                              {
+                                'id': 1007,
+                                'name': 'Lenient Group',
+                                'screen_name': 'club1007',
+                                'description': 'Search group from lenient payload',
+                                'city': 'Arsenyev',
+                                'extra': undefined,
+                              },
+                            ],
+                            'users': [
+                              {
+                                'id': 2009,
+                                'display_name': 'Irina Lenient',
+                                'first_name': 'Irina',
+                                'last_name': 'Lenient',
+                                'username': 'id2009',
+                                'city': 'Arsenyev',
+                                'home_town': 'Kavalerovo',
+                                'avatar_url': 'https://vk.com/images/2009.jpg',
+                              },
+                            ],
                           };
                         </script>
                       </body>
