@@ -32,6 +32,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/script/search", this::respondSearch);
         server.createContext("/inline/search", this::respondSearch);
         server.createContext("/nested/search", this::respondSearch);
+        server.createContext("/mapped/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -140,6 +141,33 @@ class HttpVkFallbackClientTest {
                   </body>
                 </html>
                 """));
+        server.createContext("/mapped/public1006", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "feed": {
+                          "events": [
+                            {"type": "meta", "value": "ignored"},
+                            {
+                              "type": "posts",
+                              "items": {
+                                "501": {
+                                  "post_id": 9015,
+                                  "owner_id": -1006,
+                                  "from_id": 2008,
+                                  "text": "Post from mapped payload",
+                                  "created_at": "2026-04-07T06:00:00Z"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
         server.createContext("/wall-1001_3003", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -242,6 +270,34 @@ class HttpVkFallbackClientTest {
                               ]
                             }
                           }
+                        }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/mapped/wall-1006_9015", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "replies": {
+                          "events": [
+                            {"kind": "summary"},
+                            {
+                              "kind": "comments",
+                              "items": {
+                                "601": {
+                                  "comment_id": 9016,
+                                  "post_id": 9015,
+                                  "owner_id": -1006,
+                                  "from_id": 2008,
+                                  "text": "Comment from mapped payload",
+                                  "created_at": "2026-04-07T07:00:00Z"
+                                }
+                              }
+                            }
+                          ]
                         }
                       };
                     </script>
@@ -421,6 +477,39 @@ class HttpVkFallbackClientTest {
                             }
                           }
                         }
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/mapped/id2008", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "entities": [
+                          {"type": "other"},
+                          {
+                            "type": "profiles",
+                            "items": {
+                              "701": {
+                                "id": 2008,
+                                "display_name": "Maksim Mapped",
+                                "username": "id2008",
+                                "city": "Dalnerechensk",
+                                "home_town": "Kirovsky",
+                                "birth_date": "08.08.1995",
+                                "sex": 2,
+                                "status": "mapped status",
+                                "avatar_url": "https://vk.com/images/2008.jpg",
+                                "mobile_phone": "+79990000008",
+                                "home_phone": "84232000008",
+                                "site": "https://maksim.example.com",
+                                "education": "VSUES"
+                              }
+                            }
+                          }
+                        ]
                       };
                     </script>
                   </body>
@@ -655,6 +744,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromMappedPayloadCollections() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), mappedProperties());
+
+        var groups = client.searchGroups("Mapped Region", 10);
+        var users = client.searchUsers("Mapped Region", 10);
+        var posts = client.getGroupPosts(1006L, 10);
+        var comments = client.getPostComments(-1006L, 9015L, 10);
+        var profiles = client.getUsersByIds(List.of(2008L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1006L);
+            assertThat(group.name()).isEqualTo("Mapped Group");
+            assertThat(group.screenName()).isEqualTo("club1006");
+            assertThat(group.city()).isEqualTo("Dalnerechensk");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2008L);
+            assertThat(user.displayName()).isEqualTo("Maksim Mapped");
+            assertThat(user.username()).isEqualTo("id2008");
+            assertThat(user.city()).isEqualTo("Dalnerechensk");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9015L);
+            assertThat(post.authorVkUserId()).isEqualTo(2008L);
+            assertThat(post.text()).isEqualTo("Post from mapped payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9016L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2008L);
+            assertThat(comment.text()).isEqualTo("Comment from mapped payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Maksim Mapped");
+            assertThat(user.homeTown()).isEqualTo("Kirovsky");
+            assertThat(user.birthDate()).isEqualTo("08.08.1995");
+            assertThat(user.sex()).isEqualTo(2);
+            assertThat(user.status()).isEqualTo("mapped status");
+            assertThat(user.site()).isEqualTo("https://maksim.example.com");
+            assertThat(user.education()).isEqualTo("VSUES");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -711,6 +843,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/nested",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties mappedProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/mapped",
                 Duration.ofSeconds(5)
         );
     }
@@ -819,6 +966,51 @@ class HttpVkFallbackClientTest {
                                   }
                                 }
                               }
+                            }
+                          };
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/mapped")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = {
+                            "search": {
+                              "events": [
+                                {"kind": "summary"},
+                                {
+                                  "kind": "groups",
+                                  "items": {
+                                    "801": {
+                                      "id": 1006,
+                                      "name": "Mapped Group",
+                                      "screen_name": "club1006",
+                                      "description": "Search group from mapped payload",
+                                      "city": "Dalnerechensk"
+                                    }
+                                  }
+                                },
+                                {
+                                  "kind": "users",
+                                  "items": {
+                                    "901": {
+                                      "id": 2008,
+                                      "display_name": "Maksim Mapped",
+                                      "first_name": "Maksim",
+                                      "last_name": "Mapped",
+                                      "username": "id2008",
+                                      "city": "Dalnerechensk",
+                                      "home_town": "Kirovsky",
+                                      "avatar_url": "https://vk.com/images/2008.jpg"
+                                    }
+                                  }
+                                }
+                              ]
                             }
                           };
                         </script>

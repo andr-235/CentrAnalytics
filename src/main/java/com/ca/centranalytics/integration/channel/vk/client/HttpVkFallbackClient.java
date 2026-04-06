@@ -430,26 +430,30 @@ public class HttpVkFallbackClient implements VkFallbackClient {
     }
 
     private JsonNode findArrayField(JsonNode node, String fieldName) {
-        return findField(node, fieldName, JsonNode::isArray);
+        return findCollectionField(node, fieldName);
     }
 
     private JsonNode findObjectField(JsonNode node, String fieldName) {
-        return findField(node, fieldName, JsonNode::isObject);
+        return findEntityField(node, fieldName);
     }
 
-    private JsonNode findField(JsonNode node, String fieldName, java.util.function.Predicate<JsonNode> matcher) {
+    private JsonNode findCollectionField(JsonNode node, String fieldName) {
         if (node == null || node.isNull() || node.isMissingNode()) {
             return null;
         }
-        JsonNode direct = node.path(fieldName);
-        if (!direct.isMissingNode() && !direct.isNull() && matcher.test(direct)) {
+        JsonNode direct = normalizeCollection(node.path(fieldName));
+        if (direct != null) {
             return direct;
         }
         if (node.isObject()) {
+            JsonNode labeledItems = labeledItems(node, fieldName);
+            if (labeledItems != null) {
+                return labeledItems;
+            }
             var fields = node.fields();
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> entry = fields.next();
-                JsonNode nested = findField(entry.getValue(), fieldName, matcher);
+                JsonNode nested = findCollectionField(entry.getValue(), fieldName);
                 if (nested != null) {
                     return nested;
                 }
@@ -460,9 +464,156 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             return null;
         }
         for (JsonNode item : node) {
-            JsonNode nested = findField(item, fieldName, matcher);
+            JsonNode nested = findCollectionField(item, fieldName);
             if (nested != null) {
                 return nested;
+            }
+        }
+        return null;
+    }
+
+    private JsonNode findEntityField(JsonNode node, String fieldName) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        JsonNode direct = normalizeEntity(node.path(fieldName));
+        if (direct != null) {
+            return direct;
+        }
+        if (node.isObject()) {
+            JsonNode labeledItems = labeledItems(node, fieldName);
+            JsonNode normalizedFromItems = firstEntity(labeledItems);
+            if (normalizedFromItems != null) {
+                return normalizedFromItems;
+            }
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                JsonNode nested = findEntityField(entry.getValue(), fieldName);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+            return null;
+        }
+        if (!node.isArray()) {
+            return null;
+        }
+        for (JsonNode item : node) {
+            JsonNode nested = findEntityField(item, fieldName);
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
+    }
+
+    private JsonNode labeledItems(JsonNode node, String fieldName) {
+        if (!node.isObject()) {
+            return null;
+        }
+        String label = firstNonBlank(textValue(node, "type"), textValue(node, "kind"));
+        if (!matchesFieldLabel(fieldName, label)) {
+            return null;
+        }
+        return normalizeCollection(node.path("items"));
+    }
+
+    private boolean matchesFieldLabel(String fieldName, String label) {
+        if (!StringUtils.hasText(fieldName) || !StringUtils.hasText(label)) {
+            return false;
+        }
+        String normalizedField = fieldName.trim().toLowerCase();
+        String normalizedLabel = label.trim().toLowerCase();
+        if (normalizedField.equals(normalizedLabel)) {
+            return true;
+        }
+        return singular(normalizedField).equals(singular(normalizedLabel));
+    }
+
+    private String singular(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        return value.endsWith("s") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private JsonNode normalizeCollection(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        if (node.isArray()) {
+            return node;
+        }
+        JsonNode items = node.path("items");
+        if (!items.isMissingNode() && !items.isNull() && items != node) {
+            JsonNode normalizedItems = normalizeCollection(items);
+            if (normalizedItems != null) {
+                return normalizedItems;
+            }
+        }
+        if (!node.isObject()) {
+            return null;
+        }
+        var values = node.elements();
+        var arrayNode = objectMapper.createArrayNode();
+        while (values.hasNext()) {
+            JsonNode value = values.next();
+            if (value == null || value.isNull() || value.isMissingNode()) {
+                continue;
+            }
+            arrayNode.add(value);
+        }
+        return arrayNode.isEmpty() ? null : arrayNode;
+    }
+
+    private JsonNode normalizeEntity(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        if (node.isObject()) {
+            JsonNode items = node.path("items");
+            if (!items.isMissingNode() && !items.isNull() && items.isObject()) {
+                return firstEntity(items);
+            }
+            return node;
+        }
+        if (!node.isArray()) {
+            return null;
+        }
+        for (JsonNode item : node) {
+            JsonNode normalized = normalizeEntity(item);
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    private JsonNode firstEntity(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        if (node.isObject()) {
+            if (node.hasNonNull("id") || node.hasNonNull("display_name") || node.hasNonNull("name")) {
+                return node;
+            }
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                JsonNode normalized = normalizeEntity(fields.next().getValue());
+                if (normalized != null) {
+                    return normalized;
+                }
+            }
+            return null;
+        }
+        if (!node.isArray()) {
+            return null;
+        }
+        for (JsonNode item : node) {
+            JsonNode normalized = normalizeEntity(item);
+            if (normalized != null) {
+                return normalized;
             }
         }
         return null;
