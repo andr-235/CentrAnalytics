@@ -1,6 +1,7 @@
 package com.ca.centranalytics.integration.channel.vk.service;
 
 import com.ca.centranalytics.integration.channel.vk.domain.VkGroupCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.domain.VkUserCandidate;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkUserCandidateRepository;
@@ -20,7 +21,7 @@ public class VkCandidatePersistenceService {
                     existing.setSource(candidate.getSource());
                     existing.setScreenName(candidate.getScreenName());
                     existing.setName(candidate.getName());
-                    existing.setRegionMatchSource(candidate.getRegionMatchSource());
+                    existing.setRegionMatchSource(resolveMatchSource(existing.getRegionMatchSource(), candidate.getRegionMatchSource()));
                     existing.setCollectionMethod(candidate.getCollectionMethod());
                     existing.setRawJson(candidate.getRawJson());
                     return vkGroupCandidateRepository.save(existing);
@@ -36,11 +37,21 @@ public class VkCandidatePersistenceService {
                     existing.setFirstName(candidate.getFirstName());
                     existing.setLastName(candidate.getLastName());
                     existing.setProfileUrl(candidate.getProfileUrl());
-                    existing.setRegionMatchSource(candidate.getRegionMatchSource());
+                    existing.setRegionMatchSource(resolveMatchSource(existing.getRegionMatchSource(), candidate.getRegionMatchSource()));
                     existing.setCollectionMethod(candidate.getCollectionMethod());
                     existing.setRawJson(candidate.getRawJson());
                     return vkUserCandidateRepository.save(existing);
                 })
                 .orElseGet(() -> vkUserCandidateRepository.save(candidate));
+    }
+
+    private VkMatchSource resolveMatchSource(VkMatchSource existing, VkMatchSource incoming) {
+        if (existing == null) {
+            return incoming;
+        }
+        if (incoming == null || incoming == VkMatchSource.FALLBACK) {
+            return existing;
+        }
+        return incoming;
     }
 }

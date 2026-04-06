@@ -33,18 +33,24 @@ public class VkCrawlCommandService {
     }
 
     public VkCrawlJobResponse createGroupPostsJob(Long groupId, CollectVkGroupPostsRequest request) {
-        return toResponse(vkCrawlJobService.create(
+        VkCrawlJob job = vkCrawlJobService.create(
                 VkCrawlJobType.GROUP_POSTS,
                 Map.of("groupId", groupId, "request", request)
-        ));
+        );
+        vkDiscoveryOrchestrator.runGroupPostCollection(job, groupId, request);
+        return toResponse(vkCrawlJobService.get(job.getId()));
     }
 
     public VkCrawlJobResponse createPostCommentsJob(CollectVkPostCommentsRequest request) {
-        return toResponse(vkCrawlJobService.create(VkCrawlJobType.POST_COMMENTS, request));
+        VkCrawlJob job = vkCrawlJobService.create(VkCrawlJobType.POST_COMMENTS, request);
+        vkDiscoveryOrchestrator.runPostCommentCollection(job, request);
+        return toResponse(vkCrawlJobService.get(job.getId()));
     }
 
     public VkCrawlJobResponse createUserEnrichmentJob(EnrichVkUsersRequest request) {
-        return toResponse(vkCrawlJobService.create(VkCrawlJobType.AUTHOR_PROFILE_ENRICH, request));
+        VkCrawlJob job = vkCrawlJobService.create(VkCrawlJobType.AUTHOR_PROFILE_ENRICH, request);
+        vkDiscoveryOrchestrator.runUserEnrichment(job, request);
+        return toResponse(vkCrawlJobService.get(job.getId()));
     }
 
     private VkCrawlJobResponse toResponse(VkCrawlJob job) {

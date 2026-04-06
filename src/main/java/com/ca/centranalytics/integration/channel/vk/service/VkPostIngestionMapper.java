@@ -24,6 +24,9 @@ public class VkPostIngestionMapper {
     public InboundIntegrationEvent map(VkGroupCandidate group, VkUserCandidate author, VkWallPostSnapshot snapshot) {
         String ownerId = String.valueOf(snapshot.getOwnerId());
         String postId = String.valueOf(snapshot.getPostId());
+        String sourceExternalId = group == null ? String.valueOf(Math.abs(snapshot.getOwnerId())) : String.valueOf(group.getVkGroupId());
+        String sourceName = group == null || group.getName() == null ? "VK group " + sourceExternalId : group.getName();
+        String sourceSettingsJson = "{\"groupId\":" + sourceExternalId + "}";
 
         return new InboundIntegrationEvent(
                 Platform.VK,
@@ -31,19 +34,19 @@ public class VkPostIngestionMapper {
                 "vk-wall-" + ownerId + "-" + postId,
                 snapshot.getRawJson(),
                 true,
-                String.valueOf(group.getVkGroupId()),
-                group.getName(),
-                group.getRawJson(),
+                sourceExternalId,
+                sourceName,
+                sourceSettingsJson,
                 new InboundConversation(
                         "wall-" + ownerId,
                         ConversationType.GROUP,
-                        group.getName(),
-                        group.getRawJson()
+                        sourceName,
+                        snapshot.getRawJson()
                 ),
                 vkAuthorNormalizationService.toInboundAuthor(author),
                 new InboundMessage(
                         postId,
-                        Instant.now(),
+                        snapshot.getCreatedAt() == null ? Instant.now() : snapshot.getCreatedAt(),
                         snapshot.getText(),
                         snapshot.getText() == null ? null : snapshot.getText().toLowerCase(),
                         MessageType.TEXT,

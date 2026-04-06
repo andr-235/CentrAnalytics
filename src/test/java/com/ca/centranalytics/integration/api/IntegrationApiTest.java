@@ -183,6 +183,33 @@ class IntegrationApiTest {
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.id").isNumber());
 
+        mockMvc.perform(post("/api/admin/integrations/vk/groups/{groupId}/posts/collect", 1001L)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"limit":25,"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobType").value("GROUP_POSTS"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mockMvc.perform(post("/api/admin/integrations/vk/posts/comments/collect")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"postIds":[3003],"limit":25,"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobType").value("POST_COMMENTS"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mockMvc.perform(post("/api/admin/integrations/vk/users/enrich")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"userIds":[2002],"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobType").value("AUTHOR_PROFILE_ENRICH"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
         mockMvc.perform(get("/api/admin/integrations/vk/jobs/{jobId}", vkCrawlJobId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(vkCrawlJobId))

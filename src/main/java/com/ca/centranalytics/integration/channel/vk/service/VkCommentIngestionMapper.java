@@ -25,6 +25,9 @@ public class VkCommentIngestionMapper {
         String ownerId = String.valueOf(snapshot.getOwnerId());
         String postId = String.valueOf(snapshot.getPostId());
         String commentId = String.valueOf(snapshot.getCommentId());
+        String sourceExternalId = group == null ? String.valueOf(Math.abs(snapshot.getOwnerId())) : String.valueOf(group.getVkGroupId());
+        String sourceName = group == null || group.getName() == null ? "VK group " + sourceExternalId : group.getName();
+        String sourceSettingsJson = "{\"groupId\":" + sourceExternalId + "}";
 
         return new InboundIntegrationEvent(
                 Platform.VK,
@@ -32,19 +35,19 @@ public class VkCommentIngestionMapper {
                 "vk-comment-" + ownerId + "-" + postId + "-" + commentId,
                 snapshot.getRawJson(),
                 true,
-                String.valueOf(group.getVkGroupId()),
-                group.getName(),
-                group.getRawJson(),
+                sourceExternalId,
+                sourceName,
+                sourceSettingsJson,
                 new InboundConversation(
                         "wall-" + ownerId + "-" + postId,
                         ConversationType.THREAD,
-                        group.getName() + " comments",
-                        group.getRawJson()
+                        sourceName + " comments",
+                        snapshot.getRawJson()
                 ),
                 vkAuthorNormalizationService.toInboundAuthor(author),
                 new InboundMessage(
                         commentId,
-                        Instant.now(),
+                        snapshot.getCreatedAt() == null ? Instant.now() : snapshot.getCreatedAt(),
                         snapshot.getText(),
                         snapshot.getText() == null ? null : snapshot.getText().toLowerCase(),
                         MessageType.TEXT,
