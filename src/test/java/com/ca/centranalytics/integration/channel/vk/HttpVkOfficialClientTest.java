@@ -56,7 +56,20 @@ class HttpVkOfficialClientTest {
                         "first_name": "Ivan",
                         "last_name": "Ivanov",
                         "screen_name": "id2002",
-                        "city": { "title": "Vladivostok" }
+                        "city": { "title": "Vladivostok" },
+                        "home_town": "Arsenyev",
+                        "bdate": "10.10.1990",
+                        "sex": 2,
+                        "status": "online",
+                        "last_seen": { "time": 1712400000 },
+                        "photo_200": "https://vk.com/images/2002.jpg",
+                        "mobile_phone": "+79990000001",
+                        "home_phone": "84232000000",
+                        "site": "https://example.com",
+                        "relation": 1,
+                        "university_name": "FEFU",
+                        "career": [{ "company": "CA" }],
+                        "counters": { "friends": 120 }
                       }
                     ]
                   }
@@ -101,14 +114,28 @@ class HttpVkOfficialClientTest {
                       "first_name": "Ivan",
                       "last_name": "Ivanov",
                       "domain": "id2002",
-                      "home_town": "Vladivostok"
+                      "home_town": "Vladivostok",
+                      "bdate": "10.10.1990",
+                      "sex": 2,
+                      "status": "online",
+                      "last_seen": { "time": 1712400000 },
+                      "photo_200": "https://vk.com/images/2002.jpg",
+                      "mobile_phone": "+79990000001",
+                      "home_phone": "84232000000",
+                      "site": "https://example.com",
+                      "relation": 1,
+                      "university_name": "FEFU",
+                      "career": [{ "company": "CA" }],
+                      "counters": { "friends": 120 }
                     },
                     {
                       "id": 3003,
                       "first_name": "Petr",
                       "last_name": "Petrov",
                       "screen_name": "id3003",
-                      "city": { "title": "Artem" }
+                      "city": { "title": "Artem" },
+                      "career": [],
+                      "counters": { "followers": 2 }
                     }
                   ]
                 }
@@ -156,8 +183,22 @@ class HttpVkOfficialClientTest {
 
         assertThat(results).singleElement().satisfies(result -> {
             assertThat(result.displayName()).isEqualTo("Ivan Ivanov");
+            assertThat(result.username()).isEqualTo("id2002");
             assertThat(result.profileUrl()).isEqualTo("https://vk.com/id2002");
             assertThat(result.city()).isEqualTo("Vladivostok");
+            assertThat(result.homeTown()).isEqualTo("Arsenyev");
+            assertThat(result.birthDate()).isEqualTo("10.10.1990");
+            assertThat(result.sex()).isEqualTo(2);
+            assertThat(result.status()).isEqualTo("online");
+            assertThat(result.lastSeenAt()).isEqualTo(java.time.Instant.ofEpochSecond(1712400000));
+            assertThat(result.avatarUrl()).isEqualTo("https://vk.com/images/2002.jpg");
+            assertThat(result.mobilePhone()).isEqualTo("+79990000001");
+            assertThat(result.homePhone()).isEqualTo("84232000000");
+            assertThat(result.site()).isEqualTo("https://example.com");
+            assertThat(result.relation()).isEqualTo(1);
+            assertThat(result.education()).isEqualTo("FEFU");
+            assertThat(result.careerJson()).contains("\"company\":\"CA\"");
+            assertThat(result.countersJson()).contains("\"friends\":120");
         });
         assertThat(lastQueryByMethod.get("users.search")).contains("access_token=vk-user-token");
     }
@@ -186,6 +227,10 @@ class HttpVkOfficialClientTest {
         });
         assertThat(users).extracting(user -> user.profileUrl())
                 .containsExactly("https://vk.com/id2002", "https://vk.com/id3003");
+        assertThat(users).extracting(user -> user.username())
+                .containsExactly("id2002", "id3003");
+        assertThat(users).extracting(user -> user.education())
+                .containsExactly("FEFU", null);
         assertThat(lastQueryByMethod.get("wall.get")).contains("owner_id=-1001");
         assertThat(lastQueryByMethod.get("users.get")).contains("user_ids=2002,3003");
         assertThat(lastQueryByMethod.get("users.get")).contains("access_token=vk-token");

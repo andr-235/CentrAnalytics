@@ -55,8 +55,53 @@ public class VkUserCandidate {
     @Column(name = "last_name")
     private String lastName;
 
+    @Column(name = "username")
+    private String username;
+
     @Column(name = "profile_url", length = 1024)
     private String profileUrl;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "home_town")
+    private String homeTown;
+
+    @Column(name = "birth_date", length = 64)
+    private String birthDate;
+
+    @Column(name = "sex")
+    private Integer sex;
+
+    @Column(name = "status", length = 1024)
+    private String status;
+
+    @Column(name = "last_seen_at")
+    private Instant lastSeenAt;
+
+    @Column(name = "avatar_url", length = 1024)
+    private String avatarUrl;
+
+    @Column(name = "mobile_phone", length = 64)
+    private String mobilePhone;
+
+    @Column(name = "home_phone", length = 64)
+    private String homePhone;
+
+    @Column(name = "site", length = 1024)
+    private String site;
+
+    @Column(name = "relation")
+    private Integer relation;
+
+    @Column(name = "education", length = 512)
+    private String education;
+
+    @Column(name = "career_json", columnDefinition = "text")
+    private String careerJson;
+
+    @Column(name = "counters_json", columnDefinition = "text")
+    private String countersJson;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "region_match_source", nullable = false, length = 32)

@@ -15,10 +15,10 @@ public class VkAuthorNormalizationService {
         return new InboundAuthor(
                 String.valueOf(candidate.getVkUserId()),
                 candidate.getDisplayName(),
-                null,
+                candidate.getUsername(),
                 candidate.getFirstName(),
                 candidate.getLastName(),
-                null,
+                candidate.getMobilePhone(),
                 candidate.getProfileUrl(),
                 false,
                 candidate.getRawJson()

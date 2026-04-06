@@ -1,0 +1,16 @@
+alter table vk_user_candidate
+    add column username varchar(255),
+    add column city varchar(255),
+    add column home_town varchar(255),
+    add column birth_date varchar(64),
+    add column sex integer,
+    add column status varchar(1024),
+    add column last_seen_at timestamp with time zone,
+    add column avatar_url varchar(1024),
+    add column mobile_phone varchar(64),
+    add column home_phone varchar(64),
+    add column site varchar(1024),
+    add column relation integer,
+    add column education varchar(512),
+    add column career_json text,
+    add column counters_json text;

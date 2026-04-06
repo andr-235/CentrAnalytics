@@ -34,10 +34,12 @@ class VkIngestionMapperTest {
                 .displayName("Ivan Ivanov")
                 .firstName("Ivan")
                 .lastName("Ivanov")
+                .username("id2002")
                 .profileUrl("https://vk.com/id2002")
+                .mobilePhone("+79990000001")
                 .regionMatchSource(VkMatchSource.TEXT)
                 .collectionMethod(VkCollectionMethod.OFFICIAL_API)
-                .rawJson("{\"id\":2002}")
+                .rawJson("{\"id\":2002,\"counters\":{\"friends\":120}}")
                 .build();
         VkWallPostSnapshot snapshot = VkWallPostSnapshot.builder()
                 .ownerId(-1001L)
@@ -55,6 +57,9 @@ class VkIngestionMapperTest {
         assertThat(event.conversation().externalConversationId()).isEqualTo("wall--1001");
         assertThat(event.message().externalMessageId()).isEqualTo("3003");
         assertThat(event.author().externalUserId()).isEqualTo("2002");
+        assertThat(event.author().username()).isEqualTo("id2002");
+        assertThat(event.author().phone()).isEqualTo("+79990000001");
+        assertThat(event.author().metadataJson()).contains("\"friends\":120");
     }
 
     @Test
@@ -72,7 +77,9 @@ class VkIngestionMapperTest {
                 .displayName("Ivan Ivanov")
                 .firstName("Ivan")
                 .lastName("Ivanov")
+                .username("id2002")
                 .profileUrl("https://vk.com/id2002")
+                .mobilePhone("+79990000001")
                 .regionMatchSource(VkMatchSource.TEXT)
                 .collectionMethod(VkCollectionMethod.OFFICIAL_API)
                 .rawJson("{\"id\":2002}")

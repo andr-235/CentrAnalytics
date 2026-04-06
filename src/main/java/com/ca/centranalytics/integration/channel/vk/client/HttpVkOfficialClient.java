@@ -151,15 +151,31 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 text(item, "display_name"),
                 joinNonBlank(firstName, lastName)
         );
-        String city = firstNonBlank(nestedText(item, "city", "title"), text(item, "home_town"));
+        String city = nestedText(item, "city", "title");
+        String homeTown = text(item, "home_town");
+        String education = firstNonBlank(text(item, "university_name"), text(item, "faculty_name"));
 
         return new VkUserSearchResult(
                 userId,
                 displayName,
                 firstName,
                 lastName,
+                screenName,
                 profileUrl,
                 city,
+                homeTown,
+                text(item, "bdate"),
+                integerOrNull(item.path("sex")),
+                text(item, "status"),
+                parseUnixTimestamp(item.path("last_seen").path("time")),
+                text(item, "photo_200"),
+                text(item, "mobile_phone"),
+                text(item, "home_phone"),
+                text(item, "site"),
+                integerOrNull(item.path("relation")),
+                education,
+                writeStructuredValue(item.path("career")),
+                writeStructuredValue(item.path("counters")),
                 writeValue(item)
         );
     }
@@ -246,12 +262,23 @@ public class HttpVkOfficialClient implements VkOfficialClient {
         return value > 0 ? value : null;
     }
 
+    private Integer integerOrNull(JsonNode node) {
+        return node != null && node.isInt() ? node.intValue() : null;
+    }
+
     private String writeValue(JsonNode node) {
         try {
             return objectMapper.writeValueAsString(node);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Failed to serialize VK response payload", ex);
         }
+    }
+
+    private String writeStructuredValue(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        return writeValue(node);
     }
 
     private JsonNode readTree(String body) {

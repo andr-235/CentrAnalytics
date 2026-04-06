@@ -394,7 +394,22 @@ class IntegrationPersistenceTest {
                 .displayName("Ivan Ivanov")
                 .firstName("Ivan")
                 .lastName("Ivanov")
+                .username("id2002")
                 .profileUrl("https://vk.com/id2002")
+                .city("Primorsky Krai")
+                .homeTown("Vladivostok")
+                .birthDate("10.10.1990")
+                .sex(2)
+                .status("online")
+                .lastSeenAt(Instant.parse("2026-04-06T00:00:00Z"))
+                .avatarUrl("https://vk.com/images/2002.jpg")
+                .mobilePhone("+79990000001")
+                .homePhone("84232000000")
+                .site("https://example.com")
+                .relation(1)
+                .education("FEFU")
+                .careerJson("{\"company\":\"CA\"}")
+                .countersJson("{\"friends\":120}")
                 .regionMatchSource(VkMatchSource.TEXT)
                 .collectionMethod(VkCollectionMethod.FALLBACK)
                 .rawJson("{\"id\":2002}")
@@ -424,6 +439,9 @@ class IntegrationPersistenceTest {
         assertThat(userCandidate.getId()).isNotNull();
         assertThat(wallPostSnapshot.getId()).isNotNull();
         assertThat(commentSnapshot.getId()).isNotNull();
+        assertThat(userCandidate.getUsername()).isEqualTo("id2002");
+        assertThat(userCandidate.getEducation()).isEqualTo("FEFU");
+        assertThat(userCandidate.getCountersJson()).isEqualTo("{\"friends\":120}");
 
         assertThat(vkCrawlJobRepository.findByStatus(VkCrawlJobStatus.CREATED)).hasSize(1);
         assertThat(vkGroupCandidateRepository.findByVkGroupId(1001L)).isPresent();

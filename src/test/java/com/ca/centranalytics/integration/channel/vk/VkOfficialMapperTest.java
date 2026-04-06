@@ -51,8 +51,22 @@ class VkOfficialMapperTest {
                 "Ivan Ivanov",
                 "Ivan",
                 "Ivanov",
+                "id2002",
                 "https://vk.com/id2002",
                 "Primorsky Krai",
+                "Vladivostok",
+                "10.10.1990",
+                2,
+                "online",
+                Instant.parse("2026-04-06T00:00:00Z"),
+                "https://vk.com/images/2002.jpg",
+                "+79990000001",
+                "84232000000",
+                "https://example.com",
+                1,
+                "FEFU",
+                "{\"company\":\"CA\"}",
+                "{\"friends\":120}",
                 "{\"id\":2002}"
         );
 
@@ -61,7 +75,20 @@ class VkOfficialMapperTest {
         assertThat(candidate.getVkUserId()).isEqualTo(2002L);
         assertThat(candidate.getCollectionMethod()).isEqualTo(VkCollectionMethod.OFFICIAL_API);
         assertThat(candidate.getRegionMatchSource()).isEqualTo(VkMatchSource.STRUCTURED);
+        assertThat(candidate.getUsername()).isEqualTo("id2002");
         assertThat(candidate.getProfileUrl()).isEqualTo("https://vk.com/id2002");
+        assertThat(candidate.getHomeTown()).isEqualTo("Vladivostok");
+        assertThat(candidate.getBirthDate()).isEqualTo("10.10.1990");
+        assertThat(candidate.getSex()).isEqualTo(2);
+        assertThat(candidate.getLastSeenAt()).isEqualTo(Instant.parse("2026-04-06T00:00:00Z"));
+        assertThat(candidate.getAvatarUrl()).isEqualTo("https://vk.com/images/2002.jpg");
+        assertThat(candidate.getMobilePhone()).isEqualTo("+79990000001");
+        assertThat(candidate.getHomePhone()).isEqualTo("84232000000");
+        assertThat(candidate.getSite()).isEqualTo("https://example.com");
+        assertThat(candidate.getRelation()).isEqualTo(1);
+        assertThat(candidate.getEducation()).isEqualTo("FEFU");
+        assertThat(candidate.getCareerJson()).isEqualTo("{\"company\":\"CA\"}");
+        assertThat(candidate.getCountersJson()).isEqualTo("{\"friends\":120}");
     }
 
     @Test
