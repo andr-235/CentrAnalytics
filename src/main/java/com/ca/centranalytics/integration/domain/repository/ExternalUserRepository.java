@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ExternalUserRepository extends JpaRepository<ExternalUser, Long> {
-    Optional<ExternalUser> findByPlatformAndExternalUserId(Platform platform, String externalUserId);
+    Optional<ExternalUser> findBySourceIdAndExternalUserId(Long sourceId, String externalUserId);
+    Optional<ExternalUser> findFirstByPlatformAndExternalUserIdAndSourceIsNull(Platform platform, String externalUserId);
     List<ExternalUser> findByPlatform(Platform platform);
 }

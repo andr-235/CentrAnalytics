@@ -32,8 +32,7 @@ public class IntegrationQueryService {
                         source.getId(),
                         source.getPlatform(),
                         source.getName(),
-                        source.getStatus(),
-                        source.getSettingsJson()
+                        source.getStatus()
                 ))
                 .toList();
     }

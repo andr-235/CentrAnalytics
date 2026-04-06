@@ -35,6 +35,9 @@ public class IntegrationSource {
     @Column(nullable = false, length = 32)
     private Platform platform;
 
+    @Column(name = "source_external_id", length = 255)
+    private String sourceExternalId;
+
     @Column(nullable = false)
     private String name;
 

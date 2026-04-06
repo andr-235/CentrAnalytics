@@ -8,6 +8,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
-    Optional<Conversation> findByPlatformAndExternalConversationId(Platform platform, String externalConversationId);
+    Optional<Conversation> findBySourceIdAndExternalConversationId(Long sourceId, String externalConversationId);
     List<Conversation> findByPlatform(Platform platform);
 }

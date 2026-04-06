@@ -4,7 +4,6 @@ import com.ca.centranalytics.auth.config.JwtProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +11,16 @@ import java.security.Key;
 import java.util.Date;
 
 @Service
-@RequiredArgsConstructor
 public class JwtService {
 
+    private static final String DEFAULT_FALLBACK_SECRET = "ZGV2LW9ubHktand0LXNlY3JldC1yZXBsYWNlLW1lLXdpdGgtZW52";
+
     private final JwtProperties jwtProperties;
+
+    public JwtService(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+        validateConfiguration();
+    }
 
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
@@ -50,5 +55,12 @@ public class JwtService {
     private Key getSignInKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private void validateConfiguration() {
+        String secret = jwtProperties.getSecret();
+        if (secret == null || secret.isBlank() || DEFAULT_FALLBACK_SECRET.equals(secret)) {
+            throw new IllegalStateException("JWT secret must be explicitly configured and must not use the default fallback");
+        }
     }
 }

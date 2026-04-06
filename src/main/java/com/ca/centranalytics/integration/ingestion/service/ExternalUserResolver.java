@@ -1,7 +1,7 @@
 package com.ca.centranalytics.integration.ingestion.service;
 
 import com.ca.centranalytics.integration.domain.entity.ExternalUser;
-import com.ca.centranalytics.integration.domain.entity.Platform;
+import com.ca.centranalytics.integration.domain.entity.IntegrationSource;
 import com.ca.centranalytics.integration.domain.repository.ExternalUserRepository;
 import com.ca.centranalytics.integration.ingestion.dto.InboundAuthor;
 import lombok.RequiredArgsConstructor;
@@ -13,13 +13,15 @@ public class ExternalUserResolver {
 
     private final ExternalUserRepository externalUserRepository;
 
-    public ExternalUser resolve(Platform platform, InboundAuthor inboundAuthor) {
+    public ExternalUser resolve(IntegrationSource source, InboundAuthor inboundAuthor) {
         if (inboundAuthor == null) {
             return null;
         }
 
-        return externalUserRepository.findByPlatformAndExternalUserId(platform, inboundAuthor.externalUserId())
+        return externalUserRepository.findBySourceIdAndExternalUserId(source.getId(), inboundAuthor.externalUserId())
+                .or(() -> externalUserRepository.findFirstByPlatformAndExternalUserIdAndSourceIsNull(source.getPlatform(), inboundAuthor.externalUserId()))
                 .map(existing -> {
+                    existing.setSource(source);
                     existing.setDisplayName(inboundAuthor.displayName());
                     existing.setUsername(inboundAuthor.username());
                     existing.setFirstName(inboundAuthor.firstName());
@@ -31,7 +33,8 @@ public class ExternalUserResolver {
                     return externalUserRepository.save(existing);
                 })
                 .orElseGet(() -> externalUserRepository.save(ExternalUser.builder()
-                        .platform(platform)
+                        .platform(source.getPlatform())
+                        .source(source)
                         .externalUserId(inboundAuthor.externalUserId())
                         .displayName(inboundAuthor.displayName())
                         .username(inboundAuthor.username())

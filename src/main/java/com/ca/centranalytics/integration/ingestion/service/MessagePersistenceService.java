@@ -26,7 +26,7 @@ public class MessagePersistenceService {
     public Message persist(Conversation conversation, ExternalUser author, RawEvent rawEvent, InboundMessage inboundMessage) {
         validate(inboundMessage);
 
-        Message message = messageRepository.findByPlatformAndExternalMessageId(conversation.getPlatform(), inboundMessage.externalMessageId())
+        Message message = messageRepository.findByConversationIdAndExternalMessageId(conversation.getId(), inboundMessage.externalMessageId())
                 .orElseGet(() -> Message.builder()
                         .conversation(conversation)
                         .platform(conversation.getPlatform())

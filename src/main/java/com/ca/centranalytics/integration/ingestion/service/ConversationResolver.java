@@ -14,12 +14,11 @@ public class ConversationResolver {
     private final ConversationRepository conversationRepository;
 
     public Conversation resolve(IntegrationSource source, InboundConversation inboundConversation) {
-        return conversationRepository.findByPlatformAndExternalConversationId(source.getPlatform(), inboundConversation.externalConversationId())
+        return conversationRepository.findBySourceIdAndExternalConversationId(source.getId(), inboundConversation.externalConversationId())
                 .map(existing -> {
                     existing.setTitle(inboundConversation.title());
                     existing.setType(inboundConversation.type());
                     existing.setMetadataJson(inboundConversation.metadataJson());
-                    existing.setSource(source);
                     return conversationRepository.save(existing);
                 })
                 .orElseGet(() -> conversationRepository.save(Conversation.builder()

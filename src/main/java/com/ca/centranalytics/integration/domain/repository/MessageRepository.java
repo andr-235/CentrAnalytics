@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
-    Optional<Message> findByPlatformAndExternalMessageId(Platform platform, String externalMessageId);
+    Optional<Message> findByConversationIdAndExternalMessageId(Long conversationId, String externalMessageId);
     List<Message> findByPlatform(Platform platform);
     List<Message> findByConversationId(Long conversationId);
     List<Message> findByAuthorId(Long authorId);

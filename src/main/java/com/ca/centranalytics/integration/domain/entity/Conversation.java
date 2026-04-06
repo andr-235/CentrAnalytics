@@ -25,7 +25,7 @@ import java.time.Instant;
 @Entity
 @Table(
         name = "conversation",
-        uniqueConstraints = @UniqueConstraint(name = "uk_conversation_platform_external", columnNames = {"platform", "external_conversation_id"})
+        uniqueConstraints = @UniqueConstraint(name = "uk_conversation_source_external", columnNames = {"source_id", "external_conversation_id"})
 )
 @Getter
 @Setter

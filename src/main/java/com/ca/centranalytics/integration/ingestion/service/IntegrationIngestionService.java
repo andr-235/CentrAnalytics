@@ -41,7 +41,7 @@ public class IntegrationIngestionService {
             rawEventService.updateStatus(rawEvent, ProcessingStatus.NORMALIZED, null);
 
             Conversation conversation = conversationResolver.resolve(source, event.conversation());
-            ExternalUser author = externalUserResolver.resolve(event.platform(), event.author());
+            ExternalUser author = externalUserResolver.resolve(source, event.author());
             Message message = messagePersistenceService.persist(conversation, author, rawEvent, event.message());
 
             rawEventService.updateStatus(rawEvent, ProcessingStatus.PERSISTED, null);
@@ -57,10 +57,13 @@ public class IntegrationIngestionService {
             throw new IllegalArgumentException("Inbound event sourceExternalId is required");
         }
 
-        return integrationSourceRepository.findByPlatform(event.platform()).stream()
-                .filter(source -> StringUtils.hasText(source.getSettingsJson()) && source.getSettingsJson().equals(event.sourceSettingsJson()))
-                .findFirst()
+        return integrationSourceRepository.findByPlatformAndSourceExternalId(event.platform(), event.sourceExternalId())
+                .or(() -> integrationSourceRepository.findByPlatform(event.platform()).stream()
+                        .filter(source -> !StringUtils.hasText(source.getSourceExternalId()))
+                        .filter(source -> StringUtils.hasText(source.getSettingsJson()) && source.getSettingsJson().equals(event.sourceSettingsJson()))
+                        .findFirst())
                 .map(existing -> {
+                    existing.setSourceExternalId(event.sourceExternalId());
                     existing.setName(event.sourceName());
                     existing.setStatus(IntegrationStatus.ACTIVE);
                     existing.setSettingsJson(event.sourceSettingsJson());
@@ -68,6 +71,7 @@ public class IntegrationIngestionService {
                 })
                 .orElseGet(() -> integrationSourceRepository.save(IntegrationSource.builder()
                         .platform(event.platform())
+                        .sourceExternalId(event.sourceExternalId())
                         .name(event.sourceName())
                         .status(IntegrationStatus.ACTIVE)
                         .settingsJson(event.sourceSettingsJson())

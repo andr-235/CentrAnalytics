@@ -96,6 +96,38 @@ class IntegrationIngestionServiceTest {
     }
 
     @Test
+    void keepsEntitiesSeparatedForDifferentSourcesOnSamePlatform() {
+        integrationIngestionService.ingest(validEvent());
+        integrationIngestionService.ingest(new InboundIntegrationEvent(
+                Platform.VK,
+                "message_new",
+                "vk-2000000001-777-source-2",
+                "{\"type\":\"message_new\"}",
+                true,
+                "84",
+                "VK Demo 2",
+                "{\"groupId\":84}",
+                new InboundConversation("2000000001", ConversationType.GROUP, "Community chat", "{\"peerId\":2000000001}"),
+                new InboundAuthor("123", "Ivan Ivanov", "ivan", "Ivan", "Ivanov", null, "https://vk.com/id123", false, "{\"city\":\"Moscow\"}"),
+                new InboundMessage(
+                        "777",
+                        Instant.parse("2026-04-02T00:05:00Z"),
+                        "Hello from VK source 2",
+                        "hello from vk source 2",
+                        MessageType.TEXT,
+                        null,
+                        null,
+                        List.of()
+                )
+        ));
+
+        assertThat(integrationSourceRepository.findAll()).hasSize(2);
+        assertThat(externalUserRepository.findAll()).hasSize(2);
+        assertThat(conversationRepository.findAll()).hasSize(2);
+        assertThat(messageRepository.findAll()).hasSize(2);
+    }
+
+    @Test
     void marksRawEventAsFailedWhenNormalizationBreaks() {
         InboundIntegrationEvent invalid = new InboundIntegrationEvent(
                 Platform.VK,

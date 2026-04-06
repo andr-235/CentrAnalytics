@@ -7,7 +7,6 @@ public record IntegrationSourceResponse(
         Long id,
         Platform platform,
         String name,
-        IntegrationStatus status,
-        String settingsJson
+        IntegrationStatus status
 ) {
 }

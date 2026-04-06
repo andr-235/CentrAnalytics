@@ -108,4 +108,15 @@ class JwtServiceTest {
 
         assertThrows(ExpiredJwtException.class, () -> expiredJwtService.extractUsername(token));
     }
+
+    @Test
+    void rejectsKnownDefaultSecret() {
+        JwtProperties properties = new JwtProperties();
+        properties.setSecret("ZGV2LW9ubHktand0LXNlY3JldC1yZXBsYWNlLW1lLXdpdGgtZW52");
+        properties.setExpiration(86400000L);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtService(properties));
+
+        assertEquals("JWT secret must be explicitly configured and must not use the default fallback", exception.getMessage());
+    }
 }
