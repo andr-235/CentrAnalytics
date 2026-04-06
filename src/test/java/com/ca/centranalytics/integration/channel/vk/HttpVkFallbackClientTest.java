@@ -29,6 +29,7 @@ class HttpVkFallbackClientTest {
     void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/search", this::respondSearch);
+        server.createContext("/script/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -55,6 +56,44 @@ class HttpVkFallbackClientTest {
                   </body>
                 </html>
                 """));
+        server.createContext("/public1003", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "posts": [
+                          {
+                            "post_id": 9009,
+                            "owner_id": -1003,
+                            "from_id": 2005,
+                            "text": "Post from script payload",
+                            "created_at": "2026-04-07T00:00:00Z"
+                          }
+                        ]
+                      }
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/script/public1003", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "posts": [
+                          {
+                            "post_id": 9009,
+                            "owner_id": -1003,
+                            "from_id": 2005,
+                            "text": "Post from script payload",
+                            "created_at": "2026-04-07T00:00:00Z"
+                          }
+                        ]
+                      }
+                    </script>
+                  </body>
+                </html>
+                """));
         server.createContext("/wall-1001_3003", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -74,6 +113,46 @@ class HttpVkFallbackClientTest {
                       <div class="wall_reply_text">Alt reply text</div>
                       <span data-time="1770003600"></span>
                     </div>
+                  </body>
+                </html>
+                """));
+        server.createContext("/wall-1003_9009", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "comments": [
+                          {
+                            "comment_id": 9010,
+                            "post_id": 9009,
+                            "owner_id": -1003,
+                            "from_id": 2005,
+                            "text": "Comment from script payload",
+                            "created_at": "2026-04-07T01:00:00Z"
+                          }
+                        ]
+                      }
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/script/wall-1003_9009", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "comments": [
+                          {
+                            "comment_id": 9010,
+                            "post_id": 9009,
+                            "owner_id": -1003,
+                            "from_id": 2005,
+                            "text": "Comment from script payload",
+                            "created_at": "2026-04-07T01:00:00Z"
+                          }
+                        ]
+                      }
+                    </script>
                   </body>
                 </html>
                 """));
@@ -148,6 +227,56 @@ class HttpVkFallbackClientTest {
                       <div class="label">Образование:</div>
                       <div class="value">VGUES</div>
                     </div>
+                  </body>
+                </html>
+                """));
+        server.createContext("/id2005", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "profile": {
+                          "id": 2005,
+                          "display_name": "Sergey Scriptov",
+                          "username": "id2005",
+                          "city": "Nakhodka",
+                          "home_town": "Partizansk",
+                          "birth_date": "05.05.1992",
+                          "sex": 2,
+                          "status": "script online",
+                          "avatar_url": "https://vk.com/images/2005.jpg",
+                          "mobile_phone": "+79990000005",
+                          "home_phone": "84232000005",
+                          "site": "https://sergey.example.com",
+                          "education": "DVFU"
+                        }
+                      }
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/script/id2005", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script id="vk_payload" type="application/json">
+                      {
+                        "profile": {
+                          "id": 2005,
+                          "display_name": "Sergey Scriptov",
+                          "username": "id2005",
+                          "city": "Nakhodka",
+                          "home_town": "Partizansk",
+                          "birth_date": "05.05.1992",
+                          "sex": 2,
+                          "status": "script online",
+                          "avatar_url": "https://vk.com/images/2005.jpg",
+                          "mobile_phone": "+79990000005",
+                          "home_phone": "84232000005",
+                          "site": "https://sergey.example.com",
+                          "education": "DVFU"
+                        }
+                      }
+                    </script>
                   </body>
                 </html>
                 """));
@@ -251,6 +380,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromScriptPayloads() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), scriptProperties());
+
+        var groups = client.searchGroups("Script Region", 10);
+        var users = client.searchUsers("Script Region", 10);
+        var posts = client.getGroupPosts(1003L, 10);
+        var comments = client.getPostComments(-1003L, 9009L, 10);
+        var profiles = client.getUsersByIds(List.of(2005L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1003L);
+            assertThat(group.name()).isEqualTo("Script Group");
+            assertThat(group.screenName()).isEqualTo("club1003");
+            assertThat(group.city()).isEqualTo("Nakhodka");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2005L);
+            assertThat(user.displayName()).isEqualTo("Sergey Scriptov");
+            assertThat(user.username()).isEqualTo("id2005");
+            assertThat(user.city()).isEqualTo("Nakhodka");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9009L);
+            assertThat(post.authorVkUserId()).isEqualTo(2005L);
+            assertThat(post.text()).isEqualTo("Post from script payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9010L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2005L);
+            assertThat(comment.text()).isEqualTo("Comment from script payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Sergey Scriptov");
+            assertThat(user.homeTown()).isEqualTo("Partizansk");
+            assertThat(user.birthDate()).isEqualTo("05.05.1992");
+            assertThat(user.sex()).isEqualTo(2);
+            assertThat(user.status()).isEqualTo("script online");
+            assertThat(user.site()).isEqualTo("https://sergey.example.com");
+            assertThat(user.education()).isEqualTo("DVFU");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -266,8 +438,57 @@ class HttpVkFallbackClientTest {
         );
     }
 
+    private VkProperties scriptProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/script",
+                Duration.ofSeconds(5)
+        );
+    }
+
     private void respondSearch(HttpExchange exchange) throws IOException {
         String query = firstNonBlank(exchange.getRequestURI().getQuery(), exchange.getRequestURI().getRawQuery());
+        if (exchange.getRequestURI().getPath().startsWith("/script")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script id="vk_payload" type="application/json">
+                          {
+                            "groups": [
+                              {
+                                "id": 1003,
+                                "name": "Script Group",
+                                "screen_name": "club1003",
+                                "description": "Search group from script payload",
+                                "city": "Nakhodka"
+                              }
+                            ],
+                            "users": [
+                              {
+                                "id": 2005,
+                                "display_name": "Sergey Scriptov",
+                                "first_name": "Sergey",
+                                "last_name": "Scriptov",
+                                "username": "id2005",
+                                "city": "Nakhodka",
+                                "home_town": "Partizansk",
+                                "avatar_url": "https://vk.com/images/2005.jpg"
+                              }
+                            ]
+                          }
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
         if (query != null && query.contains("communities")) {
             respond(exchange, """
                     <html>

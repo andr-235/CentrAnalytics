@@ -6,6 +6,7 @@ import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResul
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -64,6 +65,32 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     ))
             ));
         }
+        if (!results.isEmpty()) {
+            return results;
+        }
+        for (JsonNode payload : scriptPayloads(document)) {
+            JsonNode groupsNode = payload.path("groups");
+            if (!groupsNode.isArray()) {
+                continue;
+            }
+            for (JsonNode group : groupsNode) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                Long groupId = longValue(group, "id");
+                if (groupId == null) {
+                    continue;
+                }
+                results.add(new VkGroupSearchResult(
+                        groupId,
+                        textValue(group, "name"),
+                        textValue(group, "screen_name"),
+                        textValue(group, "description"),
+                        textValue(group, "city"),
+                        rawJson(group)
+                ));
+            }
+        }
         return results;
     }
 
@@ -120,6 +147,50 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     ))
             ));
         }
+        if (!results.isEmpty()) {
+            return results;
+        }
+        for (JsonNode payload : scriptPayloads(document)) {
+            JsonNode usersNode = payload.path("users");
+            if (!usersNode.isArray()) {
+                continue;
+            }
+            for (JsonNode user : usersNode) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                Long userId = longValue(user, "id");
+                if (userId == null) {
+                    continue;
+                }
+                String displayName = textValue(user, "display_name");
+                String[] names = splitName(displayName);
+                String username = firstNonBlank(textValue(user, "username"), textValue(user, "screen_name"), "id" + userId);
+                results.add(new VkUserSearchResult(
+                        userId,
+                        displayName,
+                        firstNonBlank(textValue(user, "first_name"), names[0]),
+                        firstNonBlank(textValue(user, "last_name"), names[1]),
+                        username,
+                        "https://vk.com/" + username,
+                        textValue(user, "city"),
+                        textValue(user, "home_town"),
+                        null,
+                        integerValue(user, "sex"),
+                        textValue(user, "status"),
+                        null,
+                        textValue(user, "avatar_url"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        rawJson(user)
+                ));
+            }
+        }
         return results;
     }
 
@@ -155,6 +226,32 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     ))
             ));
         }
+        if (!results.isEmpty()) {
+            return results;
+        }
+        for (JsonNode payload : scriptPayloads(document)) {
+            JsonNode postsNode = payload.path("posts");
+            if (!postsNode.isArray()) {
+                continue;
+            }
+            for (JsonNode post : postsNode) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                Long postId = longValue(post, "post_id");
+                if (postId == null) {
+                    continue;
+                }
+                results.add(new VkWallPostResult(
+                        firstNonNull(longValue(post, "owner_id"), -Math.abs(groupId)),
+                        postId,
+                        longValue(post, "from_id"),
+                        textValue(post, "text"),
+                        parseInstant(textValue(post, "created_at")),
+                        rawJson(post)
+                ));
+            }
+        }
         return results;
     }
 
@@ -184,6 +281,33 @@ public class HttpVkFallbackClient implements VkFallbackClient {
                     ))
             ));
         }
+        if (!results.isEmpty()) {
+            return results;
+        }
+        for (JsonNode payload : scriptPayloads(document)) {
+            JsonNode commentsNode = payload.path("comments");
+            if (!commentsNode.isArray()) {
+                continue;
+            }
+            for (JsonNode comment : commentsNode) {
+                if (results.size() >= limit) {
+                    break;
+                }
+                Long commentId = longValue(comment, "comment_id");
+                if (commentId == null) {
+                    continue;
+                }
+                results.add(new VkCommentResult(
+                        firstNonNull(longValue(comment, "owner_id"), ownerId),
+                        firstNonNull(longValue(comment, "post_id"), postId),
+                        commentId,
+                        longValue(comment, "from_id"),
+                        textValue(comment, "text"),
+                        parseInstant(textValue(comment, "created_at")),
+                        rawJson(comment)
+                ));
+            }
+        }
         return results;
     }
 
@@ -192,48 +316,115 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         List<VkUserSearchResult> results = new ArrayList<>();
         for (Long userId : userIds) {
             Document document = getDocument("/id" + userId, Map.of());
-            String displayName = firstNonBlank(
-                    text(document, ".page_name, h1"),
-                    extractJsonLdValue(document, "name")
-            );
-            String username = firstNonBlank(
-                    extractJsonLdValue(document, "alternateName"),
-                    "id" + userId
-            );
-            String[] names = splitName(displayName);
-            results.add(new VkUserSearchResult(
-                    userId,
-                    displayName,
-                    names[0],
-                    names[1],
-                    username,
-                    "https://vk.com/" + username,
-                    profileField(document, "Город:"),
-                    profileField(document, "Родной город:"),
-                    profileField(document, "Дата рождения:"),
-                    parseSex(profileField(document, "Пол:")),
-                    text(document, ".profile_status"),
-                    null,
-                    firstNonBlank(
-                            attr(document, ".page_avatar_img, img.page_avatar_img", "src"),
-                            attr(document, "meta[property=og:image]", "content"),
-                            extractJsonLdValue(document, "image")
-                    ),
-                    profileField(document, "Моб. телефон:"),
-                    profileField(document, "Дом. телефон:"),
-                    profileField(document, "Сайт:"),
-                    null,
-                    profileField(document, "Образование:"),
-                    null,
-                    null,
-                    rawJson(rawPayload(
-                            "id", userId,
-                            "username", username,
-                            "displayName", displayName
-                    ))
-            ));
+            VkUserSearchResult htmlResult = htmlProfileResult(document, userId);
+            if (hasMeaningfulProfileData(htmlResult)) {
+                results.add(htmlResult);
+                continue;
+            }
+            VkUserSearchResult scriptResult = scriptProfileResult(document, userId);
+            if (scriptResult != null) {
+                results.add(scriptResult);
+            } else {
+                results.add(htmlResult);
+            }
         }
         return results;
+    }
+
+    private VkUserSearchResult htmlProfileResult(Document document, Long userId) {
+        String displayName = firstNonBlank(
+                text(document, ".page_name, h1"),
+                extractJsonLdValue(document, "name")
+        );
+        String username = firstNonBlank(
+                extractJsonLdValue(document, "alternateName"),
+                "id" + userId
+        );
+        String[] names = splitName(displayName);
+        return new VkUserSearchResult(
+                userId,
+                displayName,
+                names[0],
+                names[1],
+                username,
+                "https://vk.com/" + username,
+                profileField(document, "Город:"),
+                profileField(document, "Родной город:"),
+                profileField(document, "Дата рождения:"),
+                parseSex(profileField(document, "Пол:")),
+                text(document, ".profile_status"),
+                null,
+                firstNonBlank(
+                        attr(document, ".page_avatar_img, img.page_avatar_img", "src"),
+                        attr(document, "meta[property=og:image]", "content"),
+                        extractJsonLdValue(document, "image")
+                ),
+                profileField(document, "Моб. телефон:"),
+                profileField(document, "Дом. телефон:"),
+                profileField(document, "Сайт:"),
+                null,
+                profileField(document, "Образование:"),
+                null,
+                null,
+                rawJson(rawPayload(
+                        "id", userId,
+                        "username", username,
+                        "displayName", displayName
+                ))
+        );
+    }
+
+    private boolean hasMeaningfulProfileData(VkUserSearchResult result) {
+        return StringUtils.hasText(result.displayName())
+                || StringUtils.hasText(result.city())
+                || StringUtils.hasText(result.homeTown())
+                || StringUtils.hasText(result.birthDate())
+                || result.sex() != null
+                || StringUtils.hasText(result.status())
+                || StringUtils.hasText(result.avatarUrl())
+                || StringUtils.hasText(result.mobilePhone())
+                || StringUtils.hasText(result.homePhone())
+                || StringUtils.hasText(result.site())
+                || result.relation() != null
+                || StringUtils.hasText(result.education())
+                || StringUtils.hasText(result.careerJson())
+                || StringUtils.hasText(result.countersJson());
+    }
+
+    private VkUserSearchResult scriptProfileResult(Document document, Long userId) {
+        for (JsonNode payload : scriptPayloads(document)) {
+            JsonNode profile = payload.path("profile");
+            if (profile.isMissingNode() || profile.isNull()) {
+                continue;
+            }
+            String displayName = textValue(profile, "display_name");
+            String[] names = splitName(displayName);
+            String username = firstNonBlank(textValue(profile, "username"), "id" + userId);
+            return new VkUserSearchResult(
+                    firstNonNull(longValue(profile, "id"), userId),
+                    displayName,
+                    firstNonBlank(textValue(profile, "first_name"), names[0]),
+                    firstNonBlank(textValue(profile, "last_name"), names[1]),
+                    username,
+                    "https://vk.com/" + username,
+                    textValue(profile, "city"),
+                    textValue(profile, "home_town"),
+                    textValue(profile, "birth_date"),
+                    integerValue(profile, "sex"),
+                    textValue(profile, "status"),
+                    null,
+                    textValue(profile, "avatar_url"),
+                    textValue(profile, "mobile_phone"),
+                    textValue(profile, "home_phone"),
+                    textValue(profile, "site"),
+                    integerValue(profile, "relation"),
+                    textValue(profile, "education"),
+                    jsonValue(profile, "career"),
+                    jsonValue(profile, "counters"),
+                    rawJson(profile)
+            );
+        }
+        return null;
     }
 
     private Document getDocument(String path, Map<String, String> params) {
@@ -272,6 +463,20 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             }
         }
         return null;
+    }
+
+    private List<JsonNode> scriptPayloads(Document document) {
+        List<JsonNode> payloads = new ArrayList<>();
+        for (Element script : document.select("script[type=application/json]")) {
+            try {
+                JsonNode payload = objectMapper.readTree(script.data());
+                if (payload != null && !payload.isNull()) {
+                    payloads.add(payload);
+                }
+            } catch (JsonProcessingException ignored) {
+            }
+        }
+        return payloads;
     }
 
     private String text(Element parent, String selector) {
@@ -416,9 +621,40 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         }
     }
 
+    private Long longValue(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.longValue() : parseLong(value.asText(null));
+    }
+
+    private Integer integerValue(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.intValue() : null;
+    }
+
+    private String textValue(JsonNode node, String field) {
+        String value = node.path(field).asText(null);
+        return StringUtils.hasText(value) ? value : null;
+    }
+
+    private String jsonValue(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        return rawJson(value);
+    }
+
     private String rawJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(new LinkedHashMap<>(payload));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Failed to serialize VK fallback payload", ex);
+        }
+    }
+
+    private String rawJson(JsonNode payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Failed to serialize VK fallback payload", ex);
         }
@@ -457,6 +693,13 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             }
         }
         return null;
+    }
+
+    private Instant parseInstant(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return OffsetDateTime.parse(value).toInstant();
     }
 
     private String normalizeBaseUrl(String baseUrl) {
