@@ -19,9 +19,11 @@ import org.springframework.web.client.RestClient;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class HttpVkFallbackClient implements VkFallbackClient {
@@ -467,16 +469,80 @@ public class HttpVkFallbackClient implements VkFallbackClient {
 
     private List<JsonNode> scriptPayloads(Document document) {
         List<JsonNode> payloads = new ArrayList<>();
-        for (Element script : document.select("script[type=application/json]")) {
-            try {
-                JsonNode payload = objectMapper.readTree(script.data());
-                if (payload != null && !payload.isNull()) {
-                    payloads.add(payload);
+        Set<String> seenPayloads = new LinkedHashSet<>();
+        for (Element script : document.select("script")) {
+            for (String candidate : scriptPayloadCandidates(script)) {
+                if (!StringUtils.hasText(candidate) || !seenPayloads.add(candidate)) {
+                    continue;
                 }
-            } catch (JsonProcessingException ignored) {
+                try {
+                    JsonNode payload = objectMapper.readTree(candidate);
+                    if (payload != null && !payload.isNull()) {
+                        payloads.add(payload);
+                    }
+                } catch (JsonProcessingException ignored) {
+                }
             }
         }
         return payloads;
+    }
+
+    private List<String> scriptPayloadCandidates(Element script) {
+        List<String> candidates = new ArrayList<>();
+        String scriptData = firstNonBlank(script.data(), script.html());
+        if (!StringUtils.hasText(scriptData)) {
+            return candidates;
+        }
+        if ("application/json".equalsIgnoreCase(script.attr("type"))) {
+            candidates.add(scriptData.trim());
+            return candidates;
+        }
+        String inlineObject = extractInlineJsonObject(scriptData);
+        if (StringUtils.hasText(inlineObject)) {
+            candidates.add(inlineObject);
+        }
+        return candidates;
+    }
+
+    private String extractInlineJsonObject(String scriptData) {
+        int assignmentIndex = scriptData.indexOf('=');
+        int searchFrom = assignmentIndex >= 0 ? assignmentIndex + 1 : 0;
+        int objectStart = scriptData.indexOf('{', searchFrom);
+        if (objectStart < 0) {
+            return null;
+        }
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = objectStart; i < scriptData.length(); i++) {
+            char current = scriptData.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (current == '"') {
+                inString = true;
+                continue;
+            }
+            if (current == '{') {
+                depth++;
+                continue;
+            }
+            if (current != '}') {
+                continue;
+            }
+            depth--;
+            if (depth == 0) {
+                return scriptData.substring(objectStart, i + 1).trim();
+            }
+        }
+        return null;
     }
 
     private String text(Element parent, String selector) {

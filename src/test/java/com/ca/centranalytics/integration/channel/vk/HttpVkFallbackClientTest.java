@@ -30,6 +30,7 @@ class HttpVkFallbackClientTest {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/search", this::respondSearch);
         server.createContext("/script/search", this::respondSearch);
+        server.createContext("/inline/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -94,6 +95,25 @@ class HttpVkFallbackClientTest {
                   </body>
                 </html>
                 """));
+        server.createContext("/inline/public1004", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "posts": [
+                          {
+                            "post_id": 9011,
+                            "owner_id": -1004,
+                            "from_id": 2006,
+                            "text": "Post from inline script payload",
+                            "created_at": "2026-04-07T02:00:00Z"
+                          }
+                        ]
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
         server.createContext("/wall-1001_3003", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -152,6 +172,26 @@ class HttpVkFallbackClientTest {
                           }
                         ]
                       }
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/inline/wall-1004_9011", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "comments": [
+                          {
+                            "comment_id": 9012,
+                            "post_id": 9011,
+                            "owner_id": -1004,
+                            "from_id": 2006,
+                            "text": "Comment from inline script payload",
+                            "created_at": "2026-04-07T03:00:00Z"
+                          }
+                        ]
+                      };
                     </script>
                   </body>
                 </html>
@@ -276,6 +316,31 @@ class HttpVkFallbackClientTest {
                           "education": "DVFU"
                         }
                       }
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/inline/id2006", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        "profile": {
+                          "id": 2006,
+                          "display_name": "Olga Inline",
+                          "username": "id2006",
+                          "city": "Fokino",
+                          "home_town": "Bolshoy Kamen",
+                          "birth_date": "06.06.1993",
+                          "sex": 1,
+                          "status": "inline active",
+                          "avatar_url": "https://vk.com/images/2006.jpg",
+                          "mobile_phone": "+79990000006",
+                          "home_phone": "84232000006",
+                          "site": "https://olga.example.com",
+                          "education": "MГУ"
+                        }
+                      };
                     </script>
                   </body>
                 </html>
@@ -423,6 +488,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromInlineScriptPayloads() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), inlineProperties());
+
+        var groups = client.searchGroups("Inline Region", 10);
+        var users = client.searchUsers("Inline Region", 10);
+        var posts = client.getGroupPosts(1004L, 10);
+        var comments = client.getPostComments(-1004L, 9011L, 10);
+        var profiles = client.getUsersByIds(List.of(2006L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1004L);
+            assertThat(group.name()).isEqualTo("Inline Group");
+            assertThat(group.screenName()).isEqualTo("club1004");
+            assertThat(group.city()).isEqualTo("Fokino");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2006L);
+            assertThat(user.displayName()).isEqualTo("Olga Inline");
+            assertThat(user.username()).isEqualTo("id2006");
+            assertThat(user.city()).isEqualTo("Fokino");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9011L);
+            assertThat(post.authorVkUserId()).isEqualTo(2006L);
+            assertThat(post.text()).isEqualTo("Post from inline script payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9012L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2006L);
+            assertThat(comment.text()).isEqualTo("Comment from inline script payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Olga Inline");
+            assertThat(user.homeTown()).isEqualTo("Bolshoy Kamen");
+            assertThat(user.birthDate()).isEqualTo("06.06.1993");
+            assertThat(user.sex()).isEqualTo(1);
+            assertThat(user.status()).isEqualTo("inline active");
+            assertThat(user.site()).isEqualTo("https://olga.example.com");
+            assertThat(user.education()).isEqualTo("MГУ");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -449,6 +557,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/script",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties inlineProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/inline",
                 Duration.ofSeconds(5)
         );
     }
@@ -483,6 +606,40 @@ class HttpVkFallbackClientTest {
                               }
                             ]
                           }
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/inline")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = {
+                            "groups": [
+                              {
+                                "id": 1004,
+                                "name": "Inline Group",
+                                "screen_name": "club1004",
+                                "description": "Search group from inline script payload",
+                                "city": "Fokino"
+                              }
+                            ],
+                            "users": [
+                              {
+                                "id": 2006,
+                                "display_name": "Olga Inline",
+                                "first_name": "Olga",
+                                "last_name": "Inline",
+                                "username": "id2006",
+                                "city": "Fokino",
+                                "home_town": "Bolshoy Kamen",
+                                "avatar_url": "https://vk.com/images/2006.jpg"
+                              }
+                            ]
+                          };
                         </script>
                       </body>
                     </html>
