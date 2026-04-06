@@ -33,6 +33,7 @@ public class HttpVkFallbackClient implements VkFallbackClient {
     private static final Pattern SINGLE_QUOTED_STRING = Pattern.compile("'((?:\\\\.|[^'\\\\])*)'");
     private static final Pattern TRAILING_COMMA = Pattern.compile(",(?=\\s*[}\\]])");
     private static final Pattern UNDEFINED_LITERAL = Pattern.compile("(?<![\\w$])undefined(?![\\w$])");
+    private static final Pattern BARE_OBJECT_KEY = Pattern.compile("(^|[\\{,]\\s*)([A-Za-z_$][\\w$]*)(\\s*:)", Pattern.MULTILINE);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -708,7 +709,7 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         if (!StringUtils.hasText(payload)) {
             return payload;
         }
-        String normalized = payload;
+        String normalized = stripJsComments(payload);
         normalized = UNDEFINED_LITERAL.matcher(normalized).replaceAll("null");
         normalized = TRAILING_COMMA.matcher(normalized).replaceAll("");
         Matcher matcher = SINGLE_QUOTED_STRING.matcher(normalized);
@@ -720,7 +721,8 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             matcher.appendReplacement(buffer, Matcher.quoteReplacement("\"" + value + "\""));
         }
         matcher.appendTail(buffer);
-        return buffer.toString();
+        normalized = buffer.toString();
+        return BARE_OBJECT_KEY.matcher(normalized).replaceAll("$1\"$2\"$3");
     }
 
     private String extractInlineJsonObject(String scriptData) {
@@ -732,21 +734,50 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         }
         int depth = 0;
         boolean inString = false;
+        char stringDelimiter = 0;
         boolean escaped = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
         for (int i = objectStart; i < scriptData.length(); i++) {
             char current = scriptData.charAt(i);
+            char next = i + 1 < scriptData.length() ? scriptData.charAt(i + 1) : 0;
+            if (inLineComment) {
+                if (current == '\n' || current == '\r') {
+                    inLineComment = false;
+                }
+                continue;
+            }
+            if (inBlockComment) {
+                if (current == '*' && next == '/') {
+                    inBlockComment = false;
+                    i++;
+                }
+                continue;
+            }
             if (inString) {
                 if (escaped) {
                     escaped = false;
                 } else if (current == '\\') {
                     escaped = true;
-                } else if (current == '"') {
+                } else if (current == stringDelimiter) {
                     inString = false;
+                    stringDelimiter = 0;
                 }
                 continue;
             }
-            if (current == '"') {
+            if (current == '/' && next == '/') {
+                inLineComment = true;
+                i++;
+                continue;
+            }
+            if (current == '/' && next == '*') {
+                inBlockComment = true;
+                i++;
+                continue;
+            }
+            if (current == '"' || current == '\'') {
                 inString = true;
+                stringDelimiter = current;
                 continue;
             }
             if (current == '{') {
@@ -762,6 +793,64 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             }
         }
         return null;
+    }
+
+    private String stripJsComments(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        StringBuilder result = new StringBuilder(value.length());
+        boolean inString = false;
+        char stringDelimiter = 0;
+        boolean escaped = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        for (int i = 0; i < value.length(); i++) {
+            char current = value.charAt(i);
+            char next = i + 1 < value.length() ? value.charAt(i + 1) : 0;
+            if (inLineComment) {
+                if (current == '\n' || current == '\r') {
+                    inLineComment = false;
+                    result.append(current);
+                }
+                continue;
+            }
+            if (inBlockComment) {
+                if (current == '*' && next == '/') {
+                    inBlockComment = false;
+                    i++;
+                }
+                continue;
+            }
+            if (inString) {
+                result.append(current);
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == stringDelimiter) {
+                    inString = false;
+                    stringDelimiter = 0;
+                }
+                continue;
+            }
+            if (current == '/' && next == '/') {
+                inLineComment = true;
+                i++;
+                continue;
+            }
+            if (current == '/' && next == '*') {
+                inBlockComment = true;
+                i++;
+                continue;
+            }
+            if (current == '"' || current == '\'') {
+                inString = true;
+                stringDelimiter = current;
+            }
+            result.append(current);
+        }
+        return result.toString();
     }
 
     private String text(Element parent, String selector) {

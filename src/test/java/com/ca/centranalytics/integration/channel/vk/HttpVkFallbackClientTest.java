@@ -34,6 +34,7 @@ class HttpVkFallbackClientTest {
         server.createContext("/nested/search", this::respondSearch);
         server.createContext("/mapped/search", this::respondSearch);
         server.createContext("/lenient/search", this::respondSearch);
+        server.createContext("/commented/search", this::respondSearch);
         server.createContext("/public1001", exchange -> respond(exchange, """
                 <html>
                   <body>
@@ -182,6 +183,25 @@ class HttpVkFallbackClientTest {
                             'text': 'Post from lenient payload',
                             'created_at': '2026-04-07T08:00:00Z',
                             'extra': undefined,
+                          },
+                        ],
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/commented/public1010", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        posts: [
+                          {
+                            post_id: 9020,
+                            owner_id: -1010,
+                            from_id: 2010,
+                            text: 'Post from commented payload', // post text
+                            created_at: '2026-04-07T10:00:00Z',
                           },
                         ],
                       };
@@ -339,6 +359,26 @@ class HttpVkFallbackClientTest {
                             'text': 'Comment from lenient payload',
                             'created_at': '2026-04-07T09:00:00Z',
                             'unused': undefined,
+                          },
+                        ],
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/commented/wall-1010_9020", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        comments: [
+                          {
+                            comment_id: 9021,
+                            post_id: 9020,
+                            owner_id: -1010,
+                            from_id: 2010,
+                            text: 'Comment from commented payload', /* reply text */
+                            created_at: '2026-04-07T11:00:00Z',
                           },
                         ],
                       };
@@ -577,6 +617,31 @@ class HttpVkFallbackClientTest {
                           'site': 'https://irina.example.com',
                           'education': 'DVGTU',
                           'relation': undefined,
+                        },
+                      };
+                    </script>
+                  </body>
+                </html>
+                """));
+        server.createContext("/commented/id2010", exchange -> respond(exchange, """
+                <html>
+                  <body>
+                    <script>
+                      window.__initialState = {
+                        profile: {
+                          id: 2010,
+                          display_name: 'Vera Commented',
+                          username: 'id2010',
+                          city: 'Ussuriysk',
+                          home_town: 'Mikhailovka',
+                          birth_date: '10.10.1997',
+                          sex: 1,
+                          status: 'commented status',
+                          avatar_url: 'https://vk.com/images/2010.jpg',
+                          mobile_phone: '+79990000010',
+                          home_phone: '84232000010',
+                          site: 'https://vera.example.com',
+                          education: 'VGUES', // education info
                         },
                       };
                     </script>
@@ -898,6 +963,49 @@ class HttpVkFallbackClientTest {
         });
     }
 
+    @Test
+    void parsesSearchAndCollectionFromCommentedJsPayloads() {
+        HttpVkFallbackClient client = new HttpVkFallbackClient(RestClient.builder(), new ObjectMapper(), commentedProperties());
+
+        var groups = client.searchGroups("Commented Region", 10);
+        var users = client.searchUsers("Commented Region", 10);
+        var posts = client.getGroupPosts(1010L, 10);
+        var comments = client.getPostComments(-1010L, 9020L, 10);
+        var profiles = client.getUsersByIds(List.of(2010L));
+
+        assertThat(groups).singleElement().satisfies(group -> {
+            assertThat(group.id()).isEqualTo(1010L);
+            assertThat(group.name()).isEqualTo("Commented Group");
+            assertThat(group.screenName()).isEqualTo("club1010");
+            assertThat(group.city()).isEqualTo("Ussuriysk");
+        });
+        assertThat(users).singleElement().satisfies(user -> {
+            assertThat(user.id()).isEqualTo(2010L);
+            assertThat(user.displayName()).isEqualTo("Vera Commented");
+            assertThat(user.username()).isEqualTo("id2010");
+            assertThat(user.city()).isEqualTo("Ussuriysk");
+        });
+        assertThat(posts).singleElement().satisfies(post -> {
+            assertThat(post.postId()).isEqualTo(9020L);
+            assertThat(post.authorVkUserId()).isEqualTo(2010L);
+            assertThat(post.text()).isEqualTo("Post from commented payload");
+        });
+        assertThat(comments).singleElement().satisfies(comment -> {
+            assertThat(comment.commentId()).isEqualTo(9021L);
+            assertThat(comment.authorVkUserId()).isEqualTo(2010L);
+            assertThat(comment.text()).isEqualTo("Comment from commented payload");
+        });
+        assertThat(profiles).singleElement().satisfies(user -> {
+            assertThat(user.displayName()).isEqualTo("Vera Commented");
+            assertThat(user.homeTown()).isEqualTo("Mikhailovka");
+            assertThat(user.birthDate()).isEqualTo("10.10.1997");
+            assertThat(user.sex()).isEqualTo(1);
+            assertThat(user.status()).isEqualTo("commented status");
+            assertThat(user.site()).isEqualTo("https://vera.example.com");
+            assertThat(user.education()).isEqualTo("VGUES");
+        });
+    }
+
     private VkProperties properties() {
         return new VkProperties(
                 42L,
@@ -984,6 +1092,21 @@ class HttpVkFallbackClientTest {
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/lenient",
+                Duration.ofSeconds(5)
+        );
+    }
+
+    private VkProperties commentedProperties() {
+        return new VkProperties(
+                42L,
+                "vk-secret",
+                "vk-confirm",
+                "vk-token",
+                "vk-user-token",
+                "/api/integrations/webhooks/vk",
+                "5.199",
+                "https://api.vk.com/method",
+                baseUrl + "/commented",
                 Duration.ofSeconds(5)
         );
     }
@@ -1171,6 +1294,40 @@ class HttpVkFallbackClientTest {
                                 'city': 'Arsenyev',
                                 'home_town': 'Kavalerovo',
                                 'avatar_url': 'https://vk.com/images/2009.jpg',
+                              },
+                            ],
+                          };
+                        </script>
+                      </body>
+                    </html>
+                    """);
+            return;
+        }
+        if (exchange.getRequestURI().getPath().startsWith("/commented")) {
+            respond(exchange, """
+                    <html>
+                      <body>
+                        <script>
+                          window.__initialState = {
+                            groups: [
+                              {
+                                id: 1010,
+                                name: 'Commented Group',
+                                screen_name: 'club1010',
+                                description: 'Search group from commented payload', // group description
+                                city: 'Ussuriysk',
+                              },
+                            ],
+                            users: [
+                              {
+                                id: 2010,
+                                display_name: 'Vera Commented',
+                                first_name: 'Vera',
+                                last_name: 'Commented',
+                                username: 'id2010',
+                                city: 'Ussuriysk',
+                                home_town: 'Mikhailovka',
+                                avatar_url: 'https://vk.com/images/2010.jpg', /* avatar */
                               },
                             ],
                           };
