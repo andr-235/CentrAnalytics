@@ -89,7 +89,7 @@ jobs:
 
   deploy:
     name: Deploy
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build_and_push
     environment: production
 
@@ -97,61 +97,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload compose file to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || '22' }}
-          source: compose.prod.yaml
-          target: ${{ secrets.DEPLOY_PATH }}
+      - name: Prepare deploy directory
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
 
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
+          mkdir -p "$DEPLOY_PATH"
+          cp compose.prod.yaml "$DEPLOY_PATH/compose.prod.yaml"
+
+      - name: Deploy locally
         env:
           APP_IMAGE: ${{ needs.build_and_push.outputs.image_name }}:${{ needs.build_and_push.outputs.image_tag }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || '22' }}
-          envs: APP_IMAGE,DEPLOY_PATH,GHCR_USERNAME,GHCR_TOKEN,HEALTHCHECK_URL
-          script: |
-            set -euo pipefail
+        run: |
+          set -euo pipefail
 
-            mkdir -p "$DEPLOY_PATH"
-            cd "$DEPLOY_PATH"
+          cd "$DEPLOY_PATH"
 
-            if [ ! -f .env ]; then
-              echo "Missing $DEPLOY_PATH/.env on server" >&2
-              exit 1
-            fi
-
-            if [ ! -f compose.prod.yaml ]; then
-              echo "Missing $DEPLOY_PATH/compose.prod.yaml on server" >&2
-              exit 1
-            fi
-
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-            APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml pull app
-            APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans
-
-            healthcheck_url="${HEALTHCHECK_URL:-http://127.0.0.1:8080/actuator/health}"
-
-            for _ in $(seq 1 24); do
-              if curl -fsS "$healthcheck_url" >/dev/null; then
-                exit 0
-              fi
-
-              sleep 5
-            done
-
-            echo "Health check failed: $healthcheck_url" >&2
-            docker compose --env-file .env -f compose.prod.yaml ps >&2
+          if [ ! -f .env ]; then
+            echo "Missing $DEPLOY_PATH/.env on runner host" >&2
             exit 1
+          fi
+
+          if [ ! -f compose.prod.yaml ]; then
+            echo "Missing $DEPLOY_PATH/compose.prod.yaml on runner host" >&2
+            exit 1
+          fi
+
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+          APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml pull app
+          APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans
+
+          healthcheck_url="${HEALTHCHECK_URL:-http://127.0.0.1:8080/actuator/health}"
+
+          for _ in $(seq 1 24); do
+            if curl -fsS "$healthcheck_url" >/dev/null; then
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Health check failed: $healthcheck_url" >&2
+          docker compose --env-file .env -f compose.prod.yaml ps >&2
+          exit 1

@@ -6,14 +6,10 @@ Repository is configured for a single-developer flow on GitHub Actions:
 
 - pull requests to `main` run `./mvnw test`
 - pushes to `main` run tests, build a Docker image, push it to `ghcr.io`, and deploy to your server over SSH
-- deployment uses [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) on the server and validates `/actuator/health`
+- deployment runs on a self-hosted runner on the server, copies [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory, and validates `/actuator/health`
 
 ### Required GitHub secrets
 
-- `SERVER_HOST`
-- `SERVER_PORT`
-- `SERVER_USER`
-- `SERVER_SSH_KEY`
 - `DEPLOY_PATH`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
@@ -26,8 +22,9 @@ Repository is configured for a single-developer flow on GitHub Actions:
 1. Install Docker Engine and Docker Compose plugin.
 2. Create the deploy directory, for example `/opt/centranalytics`.
 3. Copy `.env.example` to `/opt/centranalytics/.env` and fill in real secrets.
-4. Ensure the SSH user can run `docker`.
-5. The workflow will upload [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) on each deploy and restart the stack.
+4. Install and register a self-hosted GitHub Actions runner on the deployment server.
+5. Ensure the runner user can run `docker`.
+6. The workflow will copy [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory on each deploy and restart the stack.
 
 Minimal bootstrap example:
 
