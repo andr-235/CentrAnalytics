@@ -18,13 +18,18 @@ import java.util.Map;
 public class VkCrawlCommandService {
 
     private final VkCrawlJobService vkCrawlJobService;
+    private final VkDiscoveryOrchestrator vkDiscoveryOrchestrator;
 
     public VkCrawlJobResponse createGroupSearchJob(SearchVkGroupsRequest request) {
-        return toResponse(vkCrawlJobService.create(VkCrawlJobType.GROUP_SEARCH, request));
+        VkCrawlJob job = vkCrawlJobService.create(VkCrawlJobType.GROUP_SEARCH, request);
+        vkDiscoveryOrchestrator.runGroupSearch(job, request);
+        return toResponse(vkCrawlJobService.get(job.getId()));
     }
 
     public VkCrawlJobResponse createUserSearchJob(SearchVkUsersRequest request) {
-        return toResponse(vkCrawlJobService.create(VkCrawlJobType.USER_SEARCH, request));
+        VkCrawlJob job = vkCrawlJobService.create(VkCrawlJobType.USER_SEARCH, request);
+        vkDiscoveryOrchestrator.runUserSearch(job, request);
+        return toResponse(vkCrawlJobService.get(job.getId()));
     }
 
     public VkCrawlJobResponse createGroupPostsJob(Long groupId, CollectVkGroupPostsRequest request) {

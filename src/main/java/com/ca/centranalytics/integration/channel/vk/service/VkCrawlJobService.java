@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.function.Consumer;
+
 @Service
 @RequiredArgsConstructor
 public class VkCrawlJobService {
@@ -28,6 +30,12 @@ public class VkCrawlJobService {
     public VkCrawlJob get(Long id) {
         return vkCrawlJobRepository.findById(id)
                 .orElseThrow(() -> new IntegrationNotFoundException("VK crawl job not found: " + id));
+    }
+
+    public VkCrawlJob update(Long id, Consumer<VkCrawlJob> updater) {
+        VkCrawlJob job = get(id);
+        updater.accept(job);
+        return vkCrawlJobRepository.save(job);
     }
 
     private String writeValue(Object value) {

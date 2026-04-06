@@ -180,7 +180,7 @@ class IntegrationApiTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"))
-                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.id").isNumber());
 
         mockMvc.perform(get("/api/admin/integrations/vk/jobs/{jobId}", vkCrawlJobId))
