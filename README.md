@@ -71,3 +71,7 @@ tailscale funnel --bg --yes 18080
 ```
 
 `tailscale funnel --bg` stores the Funnel configuration in the Tailscale daemon and restores it after reboot, so no separate systemd unit is required as long as the Tailscale service itself starts normally.
+
+## Production Health
+
+The production compose stack for CentrAnalytics does not include Redis. Because of that, Redis actuator health is disabled in application configuration so `/actuator/health` reflects the actual dependencies of this service in production instead of reporting a false `DOWN`.
