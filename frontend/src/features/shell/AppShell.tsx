@@ -58,7 +58,7 @@ export function AppShell({
           </div>
           <div>
             <strong>Центр аналитики</strong>
-            <p>Control surface</p>
+            <p>Операционный контур</p>
           </div>
         </div>
 
@@ -86,8 +86,8 @@ export function AppShell({
         </nav>
 
         <div className="app-sidebar__footer">
-          <span>System ready</span>
-          <strong>Cold steel workspace</strong>
+          <span>Система</span>
+          <strong>Единое аналитическое пространство</strong>
         </div>
       </aside>
 

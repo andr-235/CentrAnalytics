@@ -338,7 +338,7 @@ input {
   min-height: 100vh;
   grid-template-columns: 304px minmax(0, 1fr);
   background:
-    linear-gradient(90deg, rgba(21, 31, 42, 0.96) 0, rgba(21, 31, 42, 0.96) 304px, transparent 304px),
+    linear-gradient(90deg, rgba(101, 121, 142, 0.16) 0, rgba(101, 121, 142, 0.16) 304px, transparent 304px),
     radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.7), transparent 24%),
     radial-gradient(circle at 82% 76%, rgba(123, 153, 184, 0.24), transparent 26%),
     radial-gradient(circle at 58% 38%, rgba(95, 122, 150, 0.18), transparent 32%),
@@ -350,21 +350,23 @@ input {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 30px;
   min-height: 100vh;
-  padding: 30px 22px 22px;
-  color: #dbe7f1;
-  border-right: 1px solid rgba(150, 175, 201, 0.08);
+  padding: 28px 20px 20px;
+  color: #eef4fa;
+  border-right: 1px solid rgba(77, 100, 123, 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
-    rgba(17, 25, 34, 0.96);
+    radial-gradient(circle at top left, rgba(166, 194, 222, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(56, 74, 94, 0.98), rgba(43, 58, 75, 0.97));
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .app-sidebar::after {
   position: absolute;
-  inset: 18px 14px;
-  border: 1px solid rgba(146, 168, 190, 0.08);
-  border-radius: 14px;
+  inset: 14px 12px;
+  border: 1px solid rgba(194, 214, 233, 0.11);
+  border-radius: 8px;
   content: "";
   pointer-events: none;
 }
@@ -375,37 +377,45 @@ input {
   display: flex;
   gap: 14px;
   align-items: center;
+  padding: 8px 10px 14px;
+  border-bottom: 1px solid rgba(193, 213, 232, 0.12);
 }
 
 .app-sidebar__mark {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #2c4d69 0%, #447196 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(208, 223, 237, 0.2);
+  border-radius: 6px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02)),
+    linear-gradient(135deg, #36526d 0%, #4c6d8d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 14px 28px rgba(18, 28, 40, 0.22);
 }
 
 .app-sidebar__mark span {
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #dceaf7 0%, #90b4d7 100%);
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #dceaf7 0%, #9db9d5 100%);
+  transform: rotate(45deg);
 }
 
 .app-sidebar__brand strong {
   display: block;
-  font-size: 1rem;
-  letter-spacing: 0.04em;
+  font-size: 0.98rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .app-sidebar__brand p {
   margin: 4px 0 0;
-  color: rgba(205, 221, 235, 0.64);
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
+  color: rgba(221, 232, 242, 0.7);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -413,45 +423,53 @@ input {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .app-nav-item {
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
-  color: #d4dfeb;
+  gap: 7px;
+  padding: 15px 16px;
+  border: 1px solid rgba(202, 217, 232, 0.08);
+  border-radius: 6px;
+  background: rgba(227, 236, 245, 0.03);
+  color: #e7eff7;
   text-align: left;
   cursor: pointer;
   transition:
+    box-shadow 180ms ease,
     background-color 180ms ease,
     border-color 180ms ease,
     transform 180ms ease;
 }
 
 .app-nav-item:hover {
-  border-color: rgba(143, 167, 190, 0.14);
-  background: rgba(111, 141, 172, 0.08);
+  border-color: rgba(188, 208, 227, 0.16);
+  background:
+    linear-gradient(135deg, rgba(177, 201, 224, 0.12), rgba(177, 201, 224, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .app-nav-item.is-active {
-  border-color: rgba(122, 154, 186, 0.2);
+  border-color: rgba(210, 226, 241, 0.18);
   background:
-    linear-gradient(135deg, rgba(47, 71, 95, 0.94), rgba(35, 53, 72, 0.94));
-  box-shadow: 0 14px 30px rgba(6, 11, 18, 0.24);
+    linear-gradient(180deg, rgba(236, 242, 248, 0.14), rgba(236, 242, 248, 0.04)),
+    linear-gradient(135deg, rgba(74, 101, 128, 0.74), rgba(54, 75, 97, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 12px 26px rgba(17, 26, 37, 0.22);
 }
 
 .app-nav-item__label {
-  font-size: 0.96rem;
+  font-size: 0.94rem;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .app-nav-item__description {
-  color: rgba(205, 221, 235, 0.68);
-  font-size: 0.82rem;
+  color: rgba(225, 235, 244, 0.76);
+  font-size: 0.8rem;
   line-height: 1.4;
 }
 
@@ -459,8 +477,8 @@ input {
   position: relative;
   z-index: 1;
   margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px solid rgba(143, 167, 190, 0.12);
+  padding: 18px 10px 4px;
+  border-top: 1px solid rgba(193, 213, 232, 0.12);
 }
 
 .app-sidebar__footer span,
@@ -469,15 +487,16 @@ input {
 }
 
 .app-sidebar__footer span {
-  color: rgba(205, 221, 235, 0.58);
+  color: rgba(223, 233, 242, 0.62);
   font-size: 0.76rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .app-sidebar__footer strong {
   margin-top: 6px;
   font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .app-content {
@@ -704,7 +723,7 @@ input {
   .app-shell {
     grid-template-columns: 1fr;
     background:
-      linear-gradient(180deg, rgba(21, 31, 42, 0.96) 0, rgba(21, 31, 42, 0.96) 280px, transparent 280px),
+      linear-gradient(180deg, rgba(92, 112, 132, 0.2) 0, rgba(92, 112, 132, 0.2) 312px, transparent 312px),
       radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.7), transparent 24%),
       radial-gradient(circle at 82% 76%, rgba(123, 153, 184, 0.24), transparent 26%),
       radial-gradient(circle at 58% 38%, rgba(95, 122, 150, 0.18), transparent 32%),
