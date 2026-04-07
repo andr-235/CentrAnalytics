@@ -1,0 +1,56 @@
+import type { MessageRecord } from "./dashboard.types";
+
+const DEFAULT_API_BASE_URL = "";
+
+function resolveApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  return configuredBaseUrl?.trim() || DEFAULT_API_BASE_URL;
+}
+
+export async function fetchMessages(
+  token: string,
+  options: { search?: string; platform?: string } = {}
+) {
+  const searchParams = new URLSearchParams();
+
+  if (options.search?.trim()) {
+    searchParams.set("search", options.search.trim());
+  }
+
+  if (options.platform?.trim() && options.platform !== "ALL") {
+    searchParams.set("platform", options.platform.trim());
+  }
+
+  const query = searchParams.toString();
+  const url = `${resolveApiBaseUrl()}/api/messages${query ? `?${query}` : ""}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      return {
+        ok: false as const,
+        error:
+          data && typeof data.error === "string"
+            ? data.error
+            : "Не удалось загрузить сообщения"
+      };
+    }
+
+    return {
+      ok: true as const,
+      items: Array.isArray(data) ? (data as MessageRecord[]) : []
+    };
+  } catch {
+    return {
+      ok: false as const,
+      error: "Сервер недоступен. Проверь backend и повтори запрос."
+    };
+  }
+}

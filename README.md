@@ -4,16 +4,17 @@
 
 Repository is configured for a single-developer flow on GitHub Actions:
 
-- pull requests to `main` run `./mvnw test`
-- pushes to `main` run tests, build a Docker image, push it to `ghcr.io`, and deploy to your server over SSH
-- deployment runs on a self-hosted runner on the server, copies [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory, and validates `/actuator/health`
+- pull requests to `main` run only the relevant checks for changed areas
+- pushes to `main` run selective tests, build changed container images, push them to `ghcr.io`, and deploy only the changed services
+- deployment runs on a self-hosted runner on the server, copies [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory, and validates both the frontend root and proxied backend health
 
 ### Required GitHub secrets
 
 - `DEPLOY_PATH`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
-- `HEALTHCHECK_URL` optional, defaults to `http://127.0.0.1:8080/actuator/health`
+- `FRONTEND_HEALTHCHECK_URL` optional, defaults to `http://127.0.0.1:18080/`
+- `BACKEND_HEALTHCHECK_URL` optional, defaults to `http://127.0.0.1:18080/actuator/health`
 
 `GHCR_TOKEN` should be a token that can read packages from GHCR on the target server. The workflow itself pushes images with the built-in `GITHUB_TOKEN`.
 
@@ -24,7 +25,8 @@ Repository is configured for a single-developer flow on GitHub Actions:
 3. Copy `.env.example` to `/opt/centranalytics/.env` and fill in real secrets.
 4. Install and register a self-hosted GitHub Actions runner on the deployment server.
 5. Ensure the runner user can run `docker`.
-6. The workflow will copy [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory on each deploy and restart the stack.
+6. Create `/opt/centranalytics/.images.env` on first deploy if you want to seed image refs manually, otherwise the workflow will create it.
+7. The workflow will copy [compose.prod.yaml](/home/pc051/IdeaProjects/CentrAnalytics/compose.prod.yaml) into the deploy directory on each deploy and update only the changed services.
 
 Minimal bootstrap example:
 
@@ -32,9 +34,29 @@ Minimal bootstrap example:
 sudo mkdir -p /opt/centranalytics
 sudo chown -R "$USER":"$USER" /opt/centranalytics
 cp .env.example /opt/centranalytics/.env
+touch /opt/centranalytics/.images.env
 ```
 
-The deployed image is injected at runtime via `APP_IMAGE`, so the server-side `.env` should not contain an image tag.
+The deployed image refs are stored in `/opt/centranalytics/.images.env`. The server-side `.env` should keep runtime secrets and port settings only.
+
+## Production Topology
+
+Production Docker Compose now runs:
+
+- `postgres`
+- `app`
+- `frontend`
+
+The public entrypoint is `frontend`, which serves the built Vite assets with `nginx` and proxies:
+
+- `/auth`
+- `/api`
+- `/actuator`
+- `/swagger-ui`
+- `/api-docs`
+- `/v3/api-docs`
+
+This keeps the browser on one origin and removes the need for production CORS configuration between frontend and backend.
 
 ## Wappi Webhooks
 
@@ -59,7 +81,7 @@ Notes:
 
 The server publishes webhook traffic through Tailscale Funnel:
 
-- local app target: `http://127.0.0.1:18080`
+- local frontend target: `http://127.0.0.1:18080`
 - public host: `https://debian.tail9e3c2c.ts.net`
 - current routing: `443 -> 127.0.0.1:18080`
 

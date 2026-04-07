@@ -20,8 +20,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "${APP_PORT:-8080}:8080"
+    expose:
+      - "8080"
     volumes:
       - telegram_tdlib_data:/app/.tdlib
     env_file:
@@ -36,6 +36,14 @@ services:
       TELEGRAM_USER_DEVICE_MODEL: ${TELEGRAM_USER_DEVICE_MODEL:-CentrAnalytics}
       TELEGRAM_USER_SYSTEM_VERSION: ${TELEGRAM_USER_SYSTEM_VERSION:-server}
       TELEGRAM_USER_APPLICATION_VERSION: ${TELEGRAM_USER_APPLICATION_VERSION:-1.0.0}
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE must be set for production deployments}
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${FRONTEND_PORT:-18080}:80"
 
 volumes:
   postgres_data:

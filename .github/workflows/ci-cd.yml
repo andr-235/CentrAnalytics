@@ -15,11 +15,55 @@ permissions:
 
 env:
   JAVA_VERSION: "26"
+  NODE_VERSION: "22"
 
 jobs:
-  test:
-    name: Test
+  detect_changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      deploy: ${{ steps.filter.outputs.deploy }}
+      anything: ${{ steps.summary.outputs.anything }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'pom.xml'
+              - 'Dockerfile'
+              - 'mvnw'
+              - '.mvn/**'
+            frontend:
+              - 'frontend/**'
+            deploy:
+              - 'compose.prod.yaml'
+              - '.github/workflows/ci-cd.yml'
+              - '.env.example'
+              - 'README.md'
+
+      - name: Summarize change set
+        id: summary
+        run: |
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ steps.filter.outputs.frontend }}" = "true" ] || [ "${{ steps.filter.outputs.deploy }}" = "true" ]; then
+            echo "anything=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "anything=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test_backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: detect_changes
+    if: needs.detect_changes.outputs.backend == 'true'
 
     steps:
       - name: Checkout
@@ -35,17 +79,47 @@ jobs:
       - name: Make Maven wrapper executable
         run: chmod +x mvnw
 
-      - name: Run tests
+      - name: Run backend tests
         run: ./mvnw test
 
-  build_and_push:
-    name: Build and Push Image
+  test_frontend:
+    name: Test Frontend
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name != 'pull_request'
+    needs: detect_changes
+    if: needs.detect_changes.outputs.frontend == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  build_backend:
+    name: Build and Push Backend Image
+    runs-on: ubuntu-latest
+    needs:
+      - detect_changes
+      - test_backend
+    if: github.event_name != 'pull_request' && needs.detect_changes.outputs.backend == 'true'
     outputs:
-      image_name: ${{ steps.image_meta.outputs.image_name }}
-      image_tag: ${{ steps.image_meta.outputs.image_tag }}
+      image_ref: ${{ steps.image_meta.outputs.image_ref }}
 
     steps:
       - name: Checkout
@@ -54,12 +128,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Compute image metadata
+      - name: Compute backend image metadata
         id: image_meta
         run: |
           owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "image_name=ghcr.io/${owner_lc}/centranalytics" >> "$GITHUB_OUTPUT"
-          echo "image_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          image_name="ghcr.io/${owner_lc}/centranalytics"
+          image_tag="sha-${GITHUB_SHA}"
+          echo "image_name=$image_name" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "image_ref=$image_name:$image_tag" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -77,10 +154,65 @@ jobs:
             type=raw,value=latest
             type=raw,value=${{ steps.image_meta.outputs.image_tag }}
 
-      - name: Build and push Docker image
+      - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build_frontend:
+    name: Build and Push Frontend Image
+    runs-on: ubuntu-latest
+    needs:
+      - detect_changes
+      - test_frontend
+    if: github.event_name != 'pull_request' && needs.detect_changes.outputs.frontend == 'true'
+    outputs:
+      image_ref: ${{ steps.image_meta.outputs.image_ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute frontend image metadata
+        id: image_meta
+        run: |
+          owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
+          image_name="ghcr.io/${owner_lc}/centranalytics-frontend"
+          image_tag="sha-${GITHUB_SHA}"
+          echo "image_name=$image_name" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "image_ref=$image_name:$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image_meta.outputs.image_name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.image_meta.outputs.image_tag }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -90,7 +222,18 @@ jobs:
   deploy:
     name: Deploy
     runs-on: self-hosted
-    needs: build_and_push
+    needs:
+      - detect_changes
+      - build_backend
+      - build_frontend
+    if: >-
+      ${{
+        always() &&
+        github.event_name != 'pull_request' &&
+        needs.detect_changes.outputs.anything == 'true' &&
+        (needs.build_backend.result == 'success' || needs.build_backend.result == 'skipped') &&
+        (needs.build_frontend.result == 'success' || needs.build_frontend.result == 'skipped')
+      }}
     environment: production
 
     steps:
@@ -105,14 +248,20 @@ jobs:
 
           mkdir -p "$DEPLOY_PATH"
           cp compose.prod.yaml "$DEPLOY_PATH/compose.prod.yaml"
+          touch "$DEPLOY_PATH/.images.env"
 
-      - name: Deploy locally
+      - name: Update image refs and deploy changed services
         env:
-          APP_IMAGE: ${{ needs.build_and_push.outputs.image_name }}:${{ needs.build_and_push.outputs.image_tag }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+          FRONTEND_HEALTHCHECK_URL: ${{ secrets.FRONTEND_HEALTHCHECK_URL }}
+          BACKEND_HEALTHCHECK_URL: ${{ secrets.BACKEND_HEALTHCHECK_URL }}
+          BACKEND_CHANGED: ${{ needs.detect_changes.outputs.backend }}
+          FRONTEND_CHANGED: ${{ needs.detect_changes.outputs.frontend }}
+          DEPLOY_CHANGED: ${{ needs.detect_changes.outputs.deploy }}
+          NEW_APP_IMAGE: ${{ needs.build_backend.outputs.image_ref }}
+          NEW_FRONTEND_IMAGE: ${{ needs.build_frontend.outputs.image_ref }}
         run: |
           set -euo pipefail
 
@@ -128,21 +277,78 @@ jobs:
             exit 1
           fi
 
+          if [ -f .images.env ]; then
+            set -a
+            . ./.images.env
+            set +a
+          fi
+
+          if [ "$BACKEND_CHANGED" = "true" ]; then
+            APP_IMAGE="$NEW_APP_IMAGE"
+          fi
+
+          if [ "$FRONTEND_CHANGED" = "true" ]; then
+            FRONTEND_IMAGE="$NEW_FRONTEND_IMAGE"
+          fi
+
+          if [ -z "${APP_IMAGE:-}" ]; then
+            echo "APP_IMAGE is not set. Backend image ref is required." >&2
+            exit 1
+          fi
+
+          if [ -z "${FRONTEND_IMAGE:-}" ]; then
+            echo "FRONTEND_IMAGE is not set. Frontend image ref is required." >&2
+            exit 1
+          fi
+
+          cat > .images.env <<EOF
+          APP_IMAGE=$APP_IMAGE
+          FRONTEND_IMAGE=$FRONTEND_IMAGE
+          EOF
+
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-          APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml pull app
-          APP_IMAGE="$APP_IMAGE" docker compose --env-file .env -f compose.prod.yaml up -d --remove-orphans
+          set -a
+          . ./.env
+          . ./.images.env
+          set +a
 
-          healthcheck_url="${HEALTHCHECK_URL:-http://127.0.0.1:8080/actuator/health}"
+          services_to_pull=""
+          services_to_up=""
+
+          if [ "$BACKEND_CHANGED" = "true" ]; then
+            services_to_pull="$services_to_pull app"
+            services_to_up="$services_to_up app"
+          fi
+
+          if [ "$FRONTEND_CHANGED" = "true" ]; then
+            services_to_pull="$services_to_pull frontend"
+            services_to_up="$services_to_up frontend"
+          fi
+
+          if [ -n "$services_to_pull" ]; then
+            docker compose -f compose.prod.yaml pull $services_to_pull
+          fi
+
+          if [ -n "$services_to_up" ]; then
+            docker compose -f compose.prod.yaml up -d --remove-orphans $services_to_up
+          else
+            docker compose -f compose.prod.yaml up -d --remove-orphans
+          fi
+
+          frontend_healthcheck_url="${FRONTEND_HEALTHCHECK_URL:-http://127.0.0.1:${FRONTEND_PORT:-18080}/}"
+          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://127.0.0.1:${FRONTEND_PORT:-18080}/actuator/health}"
 
           for _ in $(seq 1 24); do
-            if curl -fsS "$healthcheck_url" >/dev/null; then
+            if curl -fsS "$frontend_healthcheck_url" >/dev/null && curl -fsS "$backend_healthcheck_url" >/dev/null; then
               exit 0
             fi
 
             sleep 5
           done
 
-          echo "Health check failed: $healthcheck_url" >&2
-          docker compose --env-file .env -f compose.prod.yaml ps >&2
+          echo "Health check failed" >&2
+          echo "Frontend URL: $frontend_healthcheck_url" >&2
+          echo "Backend URL: $backend_healthcheck_url" >&2
+          docker compose -f compose.prod.yaml ps >&2
           exit 1
