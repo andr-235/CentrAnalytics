@@ -21,6 +21,8 @@ import com.ca.centranalytics.integration.domain.entity.ExternalUser;
 import com.ca.centranalytics.integration.domain.entity.IntegrationSource;
 import com.ca.centranalytics.integration.domain.entity.IntegrationStatus;
 import com.ca.centranalytics.integration.domain.entity.Message;
+import com.ca.centranalytics.integration.domain.entity.MessageAttachment;
+import com.ca.centranalytics.integration.domain.entity.MessageAttachmentContent;
 import com.ca.centranalytics.integration.domain.entity.MessageType;
 import com.ca.centranalytics.integration.domain.entity.Platform;
 import com.ca.centranalytics.integration.domain.entity.ProcessingStatus;
@@ -28,6 +30,8 @@ import com.ca.centranalytics.integration.domain.entity.RawEvent;
 import com.ca.centranalytics.integration.domain.repository.ConversationRepository;
 import com.ca.centranalytics.integration.domain.repository.ExternalUserRepository;
 import com.ca.centranalytics.integration.domain.repository.IntegrationSourceRepository;
+import com.ca.centranalytics.integration.domain.repository.MessageAttachmentContentRepository;
+import com.ca.centranalytics.integration.domain.repository.MessageAttachmentRepository;
 import com.ca.centranalytics.integration.domain.repository.MessageRepository;
 import com.ca.centranalytics.integration.domain.repository.RawEventRepository;
 import org.junit.jupiter.api.Test;
@@ -43,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -66,6 +71,12 @@ class IntegrationPersistenceTest {
 
     @Autowired
     private MessageRepository messageRepository;
+
+    @Autowired
+    private MessageAttachmentRepository messageAttachmentRepository;
+
+    @Autowired
+    private MessageAttachmentContentRepository messageAttachmentContentRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -146,6 +157,73 @@ class IntegrationPersistenceTest {
                 .extracting(Message::getConversation)
                 .extracting(Conversation::getTitle)
                 .isEqualTo("Community chat");
+    }
+
+    @Test
+    void persistsAttachmentBinaryContent() {
+        IntegrationSource source = integrationSourceRepository.saveAndFlush(IntegrationSource.builder()
+                .platform(Platform.TELEGRAM)
+                .name("Telegram Demo")
+                .status(IntegrationStatus.ACTIVE)
+                .settingsJson("{\"bot\":\"demo\"}")
+                .build());
+
+        Conversation conversation = conversationRepository.saveAndFlush(Conversation.builder()
+                .source(source)
+                .platform(Platform.TELEGRAM)
+                .externalConversationId("chat-1")
+                .type(ConversationType.DIRECT)
+                .title("Binary Chat")
+                .metadataJson("{\"chatId\":\"chat-1\"}")
+                .build());
+
+        RawEvent rawEvent = rawEventRepository.saveAndFlush(RawEvent.builder()
+                .platform(Platform.TELEGRAM)
+                .eventType("message")
+                .eventId("telegram-chat-1-1")
+                .payloadJson("{\"message_id\":1}")
+                .signatureValid(true)
+                .processingStatus(ProcessingStatus.PERSISTED)
+                .receivedAt(Instant.parse("2026-04-07T00:00:00Z"))
+                .build());
+
+        Message message = messageRepository.saveAndFlush(Message.builder()
+                .conversation(conversation)
+                .platform(Platform.TELEGRAM)
+                .externalMessageId("1")
+                .sentAt(Instant.parse("2026-04-07T00:00:01Z"))
+                .messageType(MessageType.DOCUMENT)
+                .hasAttachments(true)
+                .rawEvent(rawEvent)
+                .ingestionStatus(ProcessingStatus.PERSISTED)
+                .build());
+
+        MessageAttachment attachment = messageAttachmentRepository.saveAndFlush(MessageAttachment.builder()
+                .message(message)
+                .attachmentType("document")
+                .externalAttachmentId("file-1")
+                .mimeType("application/pdf")
+                .metadataJson("{\"fileName\":\"doc.pdf\"}")
+                .build());
+
+        byte[] content = new byte[]{0x01, 0x02, 0x03, 0x04};
+        MessageAttachmentContent savedContent = messageAttachmentContentRepository.saveAndFlush(MessageAttachmentContent.builder()
+                .attachment(attachment)
+                .content(content)
+                .fileName("doc.pdf")
+                .contentSize((long) content.length)
+                .contentSha256(HexFormat.of().formatHex(content))
+                .build());
+
+        assertThat(savedContent.getId()).isNotNull();
+        assertThat(messageAttachmentContentRepository.findByAttachmentId(attachment.getId()))
+                .isPresent()
+                .get()
+                .satisfies(found -> {
+                    assertThat(found.getFileName()).isEqualTo("doc.pdf");
+                    assertThat(found.getContentSize()).isEqualTo(4L);
+                    assertThat(found.getContent()).containsExactly(content);
+                });
     }
 
     @Test

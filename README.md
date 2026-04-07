@@ -35,3 +35,39 @@ cp .env.example /opt/centranalytics/.env
 ```
 
 The deployed image is injected at runtime via `APP_IMAGE`, so the server-side `.env` should not contain an image tag.
+
+## Wappi Webhooks
+
+Wappi inbound WhatsApp ingestion is wired through a public webhook endpoint:
+
+- app endpoint: `/api/integrations/webhooks/wappi`
+- public URL on the current server: `https://debian.tail9e3c2c.ts.net/api/integrations/webhooks/wappi`
+- required Wappi webhook type: `Все входящие сообщения и файлы`
+
+Recommended `.env` values for webhook mode:
+
+```bash
+WAPPI_WEBHOOK_PATH=/api/integrations/webhooks/wappi
+```
+
+Notes:
+
+- inbound files are persisted into PostgreSQL through `message_attachment` plus `message_attachment_content`
+- Wappi can send either media URLs or file content; the ingestion layer stores attachment metadata and binary content when the payload contains file bytes
+
+## Tailscale Funnel
+
+The server publishes webhook traffic through Tailscale Funnel:
+
+- local app target: `http://127.0.0.1:18080`
+- public host: `https://debian.tail9e3c2c.ts.net`
+- current routing: `443 -> 127.0.0.1:18080`
+
+The node was configured with:
+
+```bash
+sudo tailscale set --operator=deployer
+tailscale funnel --bg --yes 18080
+```
+
+`tailscale funnel --bg` stores the Funnel configuration in the Tailscale daemon and restores it after reboot, so no separate systemd unit is required as long as the Tailscale service itself starts normally.

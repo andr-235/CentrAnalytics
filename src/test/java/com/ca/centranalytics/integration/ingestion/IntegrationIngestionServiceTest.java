@@ -10,6 +10,7 @@ import com.ca.centranalytics.integration.domain.repository.ConversationRepositor
 import com.ca.centranalytics.integration.domain.repository.ExternalUserRepository;
 import com.ca.centranalytics.integration.domain.repository.IntegrationSourceRepository;
 import com.ca.centranalytics.integration.domain.repository.MessageAttachmentRepository;
+import com.ca.centranalytics.integration.domain.repository.MessageAttachmentContentRepository;
 import com.ca.centranalytics.integration.domain.repository.MessageRepository;
 import com.ca.centranalytics.integration.domain.repository.RawEventRepository;
 import com.ca.centranalytics.integration.ingestion.dto.InboundAttachment;
@@ -55,10 +56,14 @@ class IntegrationIngestionServiceTest {
     private MessageAttachmentRepository messageAttachmentRepository;
 
     @Autowired
+    private MessageAttachmentContentRepository messageAttachmentContentRepository;
+
+    @Autowired
     private RawEventRepository rawEventRepository;
 
     @BeforeEach
     void setUp() {
+        messageAttachmentContentRepository.deleteAll();
         messageAttachmentRepository.deleteAll();
         messageRepository.deleteAll();
         conversationRepository.deleteAll();
@@ -93,6 +98,52 @@ class IntegrationIngestionServiceTest {
         assertThat(messageRepository.findAll()).hasSize(1);
         assertThat(rawEventRepository.findAll()).hasSize(1);
         assertThat(messageAttachmentRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    void storesBinaryAttachmentContentWhenPayloadContainsBase64() {
+        InboundIntegrationEvent event = new InboundIntegrationEvent(
+                Platform.WAPPI,
+                "incoming_message",
+                "wappi-profile-1-msg-1",
+                "{\"id\":\"msg-1\"}",
+                true,
+                "profile-1",
+                "Wappi profile profile-1",
+                "{\"profileId\":\"profile-1\"}",
+                new InboundConversation("79001112233@c.us", ConversationType.DIRECT, "Client", "{\"chatType\":\"dialog\"}"),
+                new InboundAuthor("79001112233@c.us", "Client", null, null, null, "79001112233", null, false, "{}"),
+                new InboundMessage(
+                        "msg-1",
+                        Instant.parse("2026-04-07T00:00:00Z"),
+                        "Document",
+                        "document",
+                        MessageType.DOCUMENT,
+                        null,
+                        null,
+                        List.of(new InboundAttachment(
+                                "document",
+                                "doc-1",
+                                null,
+                                "application/pdf",
+                                "{\"caption\":\"Document\"}",
+                                "contract.pdf",
+                                "AQIDBA=="
+                        ))
+                )
+        );
+
+        integrationIngestionService.ingest(event);
+
+        assertThat(messageAttachmentRepository.findAll()).singleElement()
+                .extracting(attachment -> attachment.getMimeType())
+                .isEqualTo("application/pdf");
+        assertThat(messageAttachmentContentRepository.findAll()).singleElement()
+                .satisfies(content -> {
+                    assertThat(content.getFileName()).isEqualTo("contract.pdf");
+                    assertThat(content.getContentSize()).isEqualTo(4L);
+                    assertThat(content.getContent()).containsExactly(1, 2, 3, 4);
+                });
     }
 
     @Test

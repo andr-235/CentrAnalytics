@@ -1,11 +1,13 @@
 package com.ca.centranalytics.integration.ingestion.service;
 
+import com.ca.centranalytics.integration.channel.whatsapp.wappi.service.WappiAttachmentContentService;
 import com.ca.centranalytics.integration.domain.entity.Conversation;
 import com.ca.centranalytics.integration.domain.entity.ExternalUser;
 import com.ca.centranalytics.integration.domain.entity.Message;
 import com.ca.centranalytics.integration.domain.entity.MessageAttachment;
 import com.ca.centranalytics.integration.domain.entity.ProcessingStatus;
 import com.ca.centranalytics.integration.domain.entity.RawEvent;
+import com.ca.centranalytics.integration.domain.repository.MessageAttachmentContentRepository;
 import com.ca.centranalytics.integration.domain.repository.MessageAttachmentRepository;
 import com.ca.centranalytics.integration.domain.repository.MessageRepository;
 import com.ca.centranalytics.integration.ingestion.dto.InboundAttachment;
@@ -22,6 +24,8 @@ public class MessagePersistenceService {
 
     private final MessageRepository messageRepository;
     private final MessageAttachmentRepository messageAttachmentRepository;
+    private final MessageAttachmentContentRepository messageAttachmentContentRepository;
+    private final WappiAttachmentContentService wappiAttachmentContentService;
 
     public Message persist(Conversation conversation, ExternalUser author, RawEvent rawEvent, InboundMessage inboundMessage) {
         validate(inboundMessage);
@@ -52,8 +56,11 @@ public class MessagePersistenceService {
         }
 
         if (inboundMessage.attachments() != null) {
-            inboundMessage.attachments().forEach(attachment ->
-                    messageAttachmentRepository.save(toAttachment(savedMessage, attachment)));
+            inboundMessage.attachments().forEach(attachment -> {
+                MessageAttachment savedAttachment = messageAttachmentRepository.save(toAttachment(savedMessage, attachment));
+                wappiAttachmentContentService.buildContent(savedAttachment, attachment)
+                        .ifPresent(messageAttachmentContentRepository::save);
+            });
         }
 
         return savedMessage;
