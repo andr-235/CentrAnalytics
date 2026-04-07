@@ -1,6 +1,5 @@
 package com.ca.centranalytics.integration.config;
 
-import com.ca.centranalytics.integration.channel.telegram.config.TelegramProperties;
 import com.ca.centranalytics.integration.channel.telegram.user.config.TelegramUserProperties;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
 import org.junit.jupiter.api.Test;
@@ -17,19 +16,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(classes = IntegrationPropertiesTest.TestConfig.class)
 @TestPropertySource(properties = {
         "integration.vk.group-id=42",
-        "integration.vk.secret=vk-secret",
-        "integration.vk.confirmation-code=vk-confirm",
         "integration.vk.access-token=vk-token",
         "integration.vk.user-access-token=vk-user-token",
-        "integration.vk.webhook-path=/api/integrations/webhooks/vk",
         "integration.vk.api-version=5.199",
         "integration.vk.api-base-url=https://api.vk.com/method",
         "integration.vk.fallback-base-url=https://vk.com",
         "integration.vk.request-timeout=5s",
-        "integration.telegram.bot-token=tg-token",
-        "integration.telegram.webhook-secret=tg-secret",
-        "integration.telegram.webhook-path=/api/integrations/webhooks/telegram/tg-token",
-        "integration.telegram.bot-username=centranalytics_bot",
         "integration.telegram-user.enabled=true",
         "integration.telegram-user.api-id=12345",
         "integration.telegram-user.api-hash=hash-value",
@@ -46,28 +38,17 @@ class IntegrationPropertiesTest {
     private VkProperties vkProperties;
 
     @Autowired
-    private TelegramProperties telegramProperties;
-
-    @Autowired
     private TelegramUserProperties telegramUserProperties;
 
     @Test
-    void bindsVkAndTelegramProperties() {
+    void bindsVkDiscoveryAndTelegramUserProperties() {
         assertThat(vkProperties.groupId()).isEqualTo(42L);
-        assertThat(vkProperties.secret()).isEqualTo("vk-secret");
-        assertThat(vkProperties.confirmationCode()).isEqualTo("vk-confirm");
         assertThat(vkProperties.accessToken()).isEqualTo("vk-token");
         assertThat(vkProperties.userAccessToken()).isEqualTo("vk-user-token");
-        assertThat(vkProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/vk");
         assertThat(vkProperties.apiVersion()).isEqualTo("5.199");
         assertThat(vkProperties.apiBaseUrl()).isEqualTo("https://api.vk.com/method");
         assertThat(vkProperties.fallbackBaseUrl()).isEqualTo("https://vk.com");
         assertThat(vkProperties.requestTimeout()).isEqualTo(Duration.ofSeconds(5));
-
-        assertThat(telegramProperties.botToken()).isEqualTo("tg-token");
-        assertThat(telegramProperties.webhookSecret()).isEqualTo("tg-secret");
-        assertThat(telegramProperties.webhookPath()).isEqualTo("/api/integrations/webhooks/telegram/tg-token");
-        assertThat(telegramProperties.botUsername()).isEqualTo("centranalytics_bot");
 
         assertThat(telegramUserProperties.enabled()).isTrue();
         assertThat(telegramUserProperties.apiId()).isEqualTo(12345);
@@ -81,7 +62,7 @@ class IntegrationPropertiesTest {
     }
 
     @Configuration
-    @EnableConfigurationProperties({VkProperties.class, TelegramProperties.class, TelegramUserProperties.class})
+    @EnableConfigurationProperties({VkProperties.class, TelegramUserProperties.class})
     static class TestConfig {
     }
 }

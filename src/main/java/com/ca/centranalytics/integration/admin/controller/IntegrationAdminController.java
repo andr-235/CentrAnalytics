@@ -1,7 +1,6 @@
 package com.ca.centranalytics.integration.admin.controller;
 
 import com.ca.centranalytics.integration.api.dto.RawEventResponse;
-import com.ca.centranalytics.integration.api.dto.WebhookRegistrationResponse;
 import com.ca.centranalytics.integration.api.service.IntegrationQueryService;
 import com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsRequest;
@@ -14,11 +13,9 @@ import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobStatusResponse
 import com.ca.centranalytics.integration.channel.vk.api.VkGroupCandidateResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkUserCandidateResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkWallPostSnapshotResponse;
-import com.ca.centranalytics.integration.channel.telegram.service.TelegramWebhookRegistrationService;
 import com.ca.centranalytics.integration.channel.vk.service.VkCrawlCommandService;
 import com.ca.centranalytics.integration.channel.vk.service.VkDiscoveryQueryService;
 import com.ca.centranalytics.integration.channel.vk.service.VkJobQueryService;
-import com.ca.centranalytics.integration.channel.vk.service.VkWebhookRegistrationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,8 +32,6 @@ import java.util.List;
 public class IntegrationAdminController {
 
     private final IntegrationQueryService integrationQueryService;
-    private final VkWebhookRegistrationService vkWebhookRegistrationService;
-    private final TelegramWebhookRegistrationService telegramWebhookRegistrationService;
     private final VkCrawlCommandService vkCrawlCommandService;
     private final VkJobQueryService vkJobQueryService;
     private final VkDiscoveryQueryService vkDiscoveryQueryService;
@@ -44,16 +39,6 @@ public class IntegrationAdminController {
     @GetMapping("/api/raw-events/{id}")
     public RawEventResponse getRawEvent(@PathVariable Long id) {
         return integrationQueryService.getRawEvent(id);
-    }
-
-    @PostMapping("/api/admin/integrations/vk/register-webhook")
-    public WebhookRegistrationResponse registerVkWebhook() {
-        return vkWebhookRegistrationService.registerWebhook();
-    }
-
-    @PostMapping("/api/admin/integrations/telegram/register-webhook")
-    public WebhookRegistrationResponse registerTelegramWebhook() {
-        return telegramWebhookRegistrationService.registerWebhook();
     }
 
     @PostMapping("/api/admin/integrations/vk/groups/search")

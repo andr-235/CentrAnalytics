@@ -1145,11 +1145,8 @@ class HttpVkFallbackClientTest {
     private VkProperties properties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl,
@@ -1160,11 +1157,8 @@ class HttpVkFallbackClientTest {
     private VkProperties scriptProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/script",
@@ -1175,11 +1169,8 @@ class HttpVkFallbackClientTest {
     private VkProperties inlineProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/inline",
@@ -1190,11 +1181,8 @@ class HttpVkFallbackClientTest {
     private VkProperties nestedProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/nested",
@@ -1205,11 +1193,8 @@ class HttpVkFallbackClientTest {
     private VkProperties mappedProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/mapped",
@@ -1220,11 +1205,8 @@ class HttpVkFallbackClientTest {
     private VkProperties lenientProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/lenient",
@@ -1235,11 +1217,8 @@ class HttpVkFallbackClientTest {
     private VkProperties commentedProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/commented",
@@ -1250,11 +1229,8 @@ class HttpVkFallbackClientTest {
     private VkProperties jsonParseProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/jsonparse",
@@ -1265,11 +1241,8 @@ class HttpVkFallbackClientTest {
     private VkProperties dataBlobProperties() {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 "vk-token",
                 "vk-user-token",
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 "https://api.vk.com/method",
                 baseUrl + "/datablob",

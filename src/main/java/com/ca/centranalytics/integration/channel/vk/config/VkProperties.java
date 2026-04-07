@@ -7,11 +7,8 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "integration.vk")
 public record VkProperties(
         long groupId,
-        String secret,
-        String confirmationCode,
         String accessToken,
         String userAccessToken,
-        String webhookPath,
         String apiVersion,
         String apiBaseUrl,
         String fallbackBaseUrl,

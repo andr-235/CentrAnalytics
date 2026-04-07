@@ -262,10 +262,6 @@ class IntegrationApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventId").value("vk-evt-1"));
 
-        mockMvc.perform(post("/api/admin/integrations/vk/register-webhook"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.platform").value("VK"));
-
         mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
                         .contentType(APPLICATION_JSON)
                         .content("""

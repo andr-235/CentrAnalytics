@@ -105,11 +105,8 @@ class HttpVkOfficialClientTest {
     private VkProperties properties(String accessToken, String userAccessToken, String apiBaseUrl) {
         return new VkProperties(
                 42L,
-                "vk-secret",
-                "vk-confirm",
                 accessToken,
                 userAccessToken,
-                "/api/integrations/webhooks/vk",
                 "5.199",
                 apiBaseUrl,
                 "https://vk.com",
