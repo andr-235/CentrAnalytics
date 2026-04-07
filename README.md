@@ -77,6 +77,34 @@ Notes:
 - inbound files are persisted into PostgreSQL through `message_attachment` plus `message_attachment_content`
 - Wappi can send either media URLs or file content; the ingestion layer stores attachment metadata and binary content when the payload contains file bytes
 
+## VK Auto Collection
+
+VK ingestion now supports scheduled region-based collection without webhooks:
+
+- the app periodically searches VK groups for the configured region
+- for discovered groups it collects recent wall posts
+- for recent posts it also collects comments
+- collected posts and comments are normalized into the shared integration messages feed
+
+Recommended `.env` values for scheduler mode:
+
+```bash
+VK_AUTO_COLLECTION_ENABLED=true
+VK_AUTO_COLLECTION_REGION=Primorsky Krai
+VK_AUTO_COLLECTION_GROUP_SEARCH_LIMIT=25
+VK_AUTO_COLLECTION_POST_LIMIT=10
+VK_AUTO_COLLECTION_COMMENT_POST_LIMIT=5
+VK_AUTO_COLLECTION_COMMENT_LIMIT=20
+VK_AUTO_COLLECTION_MODE=HYBRID
+VK_AUTO_COLLECTION_FIXED_DELAY_MS=900000
+```
+
+Notes:
+
+- `VK_AUTO_COLLECTION_REGION` is required when scheduler mode is enabled
+- `VK_AUTO_COLLECTION_FIXED_DELAY_MS` controls how often the background collection runs
+- auto-collection reuses the existing discovery and ingestion pipeline, so repeated runs are safe for already known posts and comments
+
 ## Tailscale Funnel
 
 The server publishes webhook traffic through Tailscale Funnel:

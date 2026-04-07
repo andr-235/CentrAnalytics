@@ -1,6 +1,7 @@
 package com.ca.centranalytics.integration.config;
 
 import com.ca.centranalytics.integration.channel.telegram.user.config.TelegramUserProperties;
+import com.ca.centranalytics.integration.channel.vk.config.VkAutoCollectionProperties;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.vk.api-base-url=https://api.vk.com/method",
         "integration.vk.fallback-base-url=https://vk.com",
         "integration.vk.request-timeout=5s",
+        "integration.vk.auto-collection.enabled=true",
+        "integration.vk.auto-collection.region=Primorsky Krai",
+        "integration.vk.auto-collection.group-search-limit=25",
+        "integration.vk.auto-collection.post-limit=10",
+        "integration.vk.auto-collection.comment-post-limit=5",
+        "integration.vk.auto-collection.comment-limit=20",
+        "integration.vk.auto-collection.collection-mode=HYBRID",
+        "integration.vk.auto-collection.fixed-delay-ms=900000",
         "integration.telegram-user.enabled=true",
         "integration.telegram-user.api-id=12345",
         "integration.telegram-user.api-hash=hash-value",
@@ -38,6 +47,9 @@ class IntegrationPropertiesTest {
     private VkProperties vkProperties;
 
     @Autowired
+    private VkAutoCollectionProperties vkAutoCollectionProperties;
+
+    @Autowired
     private TelegramUserProperties telegramUserProperties;
 
     @Test
@@ -49,6 +61,14 @@ class IntegrationPropertiesTest {
         assertThat(vkProperties.apiBaseUrl()).isEqualTo("https://api.vk.com/method");
         assertThat(vkProperties.fallbackBaseUrl()).isEqualTo("https://vk.com");
         assertThat(vkProperties.requestTimeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(vkAutoCollectionProperties.enabled()).isTrue();
+        assertThat(vkAutoCollectionProperties.region()).isEqualTo("Primorsky Krai");
+        assertThat(vkAutoCollectionProperties.groupSearchLimit()).isEqualTo(25);
+        assertThat(vkAutoCollectionProperties.postLimit()).isEqualTo(10);
+        assertThat(vkAutoCollectionProperties.commentPostLimit()).isEqualTo(5);
+        assertThat(vkAutoCollectionProperties.commentLimit()).isEqualTo(20);
+        assertThat(vkAutoCollectionProperties.collectionMode()).isEqualTo("HYBRID");
+        assertThat(vkAutoCollectionProperties.fixedDelayMs()).isEqualTo(900000L);
 
         assertThat(telegramUserProperties.enabled()).isTrue();
         assertThat(telegramUserProperties.apiId()).isEqualTo(12345);
@@ -62,7 +82,7 @@ class IntegrationPropertiesTest {
     }
 
     @Configuration
-    @EnableConfigurationProperties({VkProperties.class, TelegramUserProperties.class})
+    @EnableConfigurationProperties({VkProperties.class, VkAutoCollectionProperties.class, TelegramUserProperties.class})
     static class TestConfig {
     }
 }
