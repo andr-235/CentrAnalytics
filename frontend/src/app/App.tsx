@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { IntegrationsPage } from "../features/integrations/IntegrationsPage";
 import { AppShell } from "../features/shell/AppShell";
 
 type Section = "messages" | "conversations" | "users" | "integrations" | "settings";
@@ -22,6 +23,8 @@ export default function App() {
     <AppShell activeItem={activeSection} onNavigate={setActiveSection}>
       {activeSection === "messages" ? (
         <DashboardPage token={token} />
+      ) : activeSection === "integrations" ? (
+        <IntegrationsPage token={token} />
       ) : (
         <section className="placeholder-page">
           <p className="placeholder-page__eyebrow">Раздел в работе</p>
