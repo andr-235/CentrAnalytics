@@ -26,7 +26,7 @@ public class TelegramUserAdminController {
 
     @PostMapping("/api/admin/integrations/telegram-user/{id}/code")
     public TelegramUserSessionResponse submitCode(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody SubmitTelegramAuthCodeRequest request
     ) {
         return telegramUserAuthService.submitCode(id, request);
@@ -34,14 +34,14 @@ public class TelegramUserAdminController {
 
     @PostMapping("/api/admin/integrations/telegram-user/{id}/password")
     public TelegramUserSessionResponse submitPassword(
-            @PathVariable Long id,
+            @PathVariable String id,
             @Valid @RequestBody SubmitTelegramPasswordRequest request
     ) {
         return telegramUserAuthService.submitPassword(id, request);
     }
 
     @GetMapping("/api/admin/integrations/telegram-user/{id}/status")
-    public TelegramUserSessionResponse getStatus(@PathVariable Long id) {
+    public TelegramUserSessionResponse getStatus(@PathVariable String id) {
         return telegramUserAuthService.getStatus(id);
     }
 

@@ -5,7 +5,7 @@ import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUs
 import java.time.Instant;
 
 public record TelegramUserSessionResponse(
-        Long id,
+        String id,
         String phoneNumber,
         Long telegramUserId,
         TelegramUserSessionState state,

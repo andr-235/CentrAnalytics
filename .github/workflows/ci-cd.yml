@@ -24,6 +24,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      telegram_gateway: ${{ steps.filter.outputs.telegram_gateway }}
       deploy: ${{ steps.filter.outputs.deploy }}
       anything: ${{ steps.summary.outputs.anything }}
 
@@ -44,6 +45,8 @@ jobs:
               - '.mvn/**'
             frontend:
               - 'frontend/**'
+            telegram_gateway:
+              - 'telegram-auth-gateway/**'
             deploy:
               - 'compose.prod.yaml'
               - '.github/workflows/ci-cd.yml'
@@ -53,7 +56,7 @@ jobs:
       - name: Summarize change set
         id: summary
         run: |
-          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ steps.filter.outputs.frontend }}" = "true" ] || [ "${{ steps.filter.outputs.deploy }}" = "true" ]; then
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ steps.filter.outputs.frontend }}" = "true" ] || [ "${{ steps.filter.outputs.telegram_gateway }}" = "true" ] || [ "${{ steps.filter.outputs.deploy }}" = "true" ]; then
             echo "anything=true" >> "$GITHUB_OUTPUT"
           else
             echo "anything=false" >> "$GITHUB_OUTPUT"
@@ -109,6 +112,35 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
+        run: npm run build
+
+  test_telegram_gateway:
+    name: Test Telegram Gateway
+    runs-on: ubuntu-latest
+    needs: detect_changes
+    if: needs.detect_changes.outputs.telegram_gateway == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: telegram-auth-gateway/package-lock.json
+
+      - name: Install gateway dependencies
+        working-directory: telegram-auth-gateway
+        run: npm ci
+
+      - name: Run gateway tests
+        working-directory: telegram-auth-gateway
+        run: npm test
+
+      - name: Build gateway
+        working-directory: telegram-auth-gateway
         run: npm run build
 
   build_backend:
@@ -219,6 +251,60 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  build_telegram_gateway:
+    name: Build and Push Telegram Gateway Image
+    runs-on: ubuntu-latest
+    needs:
+      - detect_changes
+      - test_telegram_gateway
+    if: github.event_name != 'pull_request' && needs.detect_changes.outputs.telegram_gateway == 'true'
+    outputs:
+      image_ref: ${{ steps.image_meta.outputs.image_ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute gateway image metadata
+        id: image_meta
+        run: |
+          owner_lc="${GITHUB_REPOSITORY_OWNER,,}"
+          image_name="ghcr.io/${owner_lc}/centranalytics-telegram-auth-gateway"
+          image_tag="sha-${GITHUB_SHA}"
+          echo "image_name=$image_name" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "image_ref=$image_name:$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image_meta.outputs.image_name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.image_meta.outputs.image_tag }}
+
+      - name: Build and push gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./telegram-auth-gateway
+          file: ./telegram-auth-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy:
     name: Deploy
     runs-on: self-hosted
@@ -226,13 +312,15 @@ jobs:
       - detect_changes
       - build_backend
       - build_frontend
+      - build_telegram_gateway
     if: >-
       ${{
         always() &&
         github.event_name != 'pull_request' &&
         needs.detect_changes.outputs.anything == 'true' &&
         (needs.build_backend.result == 'success' || needs.build_backend.result == 'skipped') &&
-        (needs.build_frontend.result == 'success' || needs.build_frontend.result == 'skipped')
+        (needs.build_frontend.result == 'success' || needs.build_frontend.result == 'skipped') &&
+        (needs.build_telegram_gateway.result == 'success' || needs.build_telegram_gateway.result == 'skipped')
       }}
     environment: production
 
@@ -259,9 +347,11 @@ jobs:
           BACKEND_HEALTHCHECK_URL: ${{ secrets.BACKEND_HEALTHCHECK_URL }}
           BACKEND_CHANGED: ${{ needs.detect_changes.outputs.backend }}
           FRONTEND_CHANGED: ${{ needs.detect_changes.outputs.frontend }}
+          TELEGRAM_GATEWAY_CHANGED: ${{ needs.detect_changes.outputs.telegram_gateway }}
           DEPLOY_CHANGED: ${{ needs.detect_changes.outputs.deploy }}
           NEW_APP_IMAGE: ${{ needs.build_backend.outputs.image_ref }}
           NEW_FRONTEND_IMAGE: ${{ needs.build_frontend.outputs.image_ref }}
+          NEW_TELEGRAM_AUTH_GATEWAY_IMAGE: ${{ needs.build_telegram_gateway.outputs.image_ref }}
         run: |
           set -euo pipefail
 
@@ -291,6 +381,10 @@ jobs:
             FRONTEND_IMAGE="$NEW_FRONTEND_IMAGE"
           fi
 
+          if [ "$TELEGRAM_GATEWAY_CHANGED" = "true" ]; then
+            TELEGRAM_AUTH_GATEWAY_IMAGE="$NEW_TELEGRAM_AUTH_GATEWAY_IMAGE"
+          fi
+
           if [ -z "${APP_IMAGE:-}" ]; then
             echo "APP_IMAGE is not set. Backend image ref is required." >&2
             exit 1
@@ -301,9 +395,15 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${TELEGRAM_AUTH_GATEWAY_IMAGE:-}" ]; then
+            echo "TELEGRAM_AUTH_GATEWAY_IMAGE is not set. Gateway image ref is required." >&2
+            exit 1
+          fi
+
           cat > .images.env <<EOF
           APP_IMAGE=$APP_IMAGE
           FRONTEND_IMAGE=$FRONTEND_IMAGE
+          TELEGRAM_AUTH_GATEWAY_IMAGE=$TELEGRAM_AUTH_GATEWAY_IMAGE
           EOF
 
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
@@ -324,6 +424,11 @@ jobs:
           if [ "$FRONTEND_CHANGED" = "true" ]; then
             services_to_pull="$services_to_pull frontend"
             services_to_up="$services_to_up frontend"
+          fi
+
+          if [ "$TELEGRAM_GATEWAY_CHANGED" = "true" ]; then
+            services_to_pull="$services_to_pull telegram-auth-gateway"
+            services_to_up="$services_to_up telegram-auth-gateway"
           fi
 
           if [ -n "$services_to_pull" ]; then

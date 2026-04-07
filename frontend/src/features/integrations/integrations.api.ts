@@ -108,7 +108,7 @@ export function startTelegramSession(token: string, phoneNumber: string) {
   });
 }
 
-export function submitTelegramCode(token: string, sessionId: number, code: string) {
+export function submitTelegramCode(token: string, sessionId: string, code: string) {
   return submitTelegramAction(
     token,
     `/api/admin/integrations/telegram-user/${sessionId}/code`,
@@ -116,11 +116,7 @@ export function submitTelegramCode(token: string, sessionId: number, code: strin
   );
 }
 
-export function submitTelegramPassword(
-  token: string,
-  sessionId: number,
-  password: string
-) {
+export function submitTelegramPassword(token: string, sessionId: string, password: string) {
   return submitTelegramAction(
     token,
     `/api/admin/integrations/telegram-user/${sessionId}/password`,

@@ -50,3 +50,5 @@ frontend/dist/
 frontend/*.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
+telegram-auth-gateway/node_modules/
+telegram-auth-gateway/dist/

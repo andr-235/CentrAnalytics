@@ -6,7 +6,7 @@ export type TelegramSessionState =
   | "CREATED";
 
 export type TelegramSessionRecord = {
-  id: number;
+  id: string;
   phoneNumber: string;
   telegramUserId: number | null;
   state: TelegramSessionState;

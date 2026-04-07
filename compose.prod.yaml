@@ -20,6 +20,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      telegram-auth-gateway:
+        condition: service_started
     expose:
       - "8080"
     volumes:
@@ -37,6 +39,25 @@ services:
       TELEGRAM_USER_SYSTEM_VERSION: ${TELEGRAM_USER_SYSTEM_VERSION:-server}
       TELEGRAM_USER_APPLICATION_VERSION: ${TELEGRAM_USER_APPLICATION_VERSION:-1.0.0}
 
+  telegram-auth-gateway:
+    image: ${TELEGRAM_AUTH_GATEWAY_IMAGE:?TELEGRAM_AUTH_GATEWAY_IMAGE must be set for production deployments}
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "8091"
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_USER_API_ID:?TELEGRAM_USER_API_ID must be set}
+      TELEGRAM_API_HASH: ${TELEGRAM_USER_API_HASH:?TELEGRAM_USER_API_HASH must be set}
+      TELEGRAM_AUTH_DATA_DIR: /data
+      TELEGRAM_SOCKS5_PROXY_ENABLED: ${TELEGRAM_AUTH_GATEWAY_PROXY_ENABLED:-false}
+      TELEGRAM_SOCKS5_PROXY_HOST: ${TELEGRAM_AUTH_GATEWAY_PROXY_HOST:-}
+      TELEGRAM_SOCKS5_PROXY_PORT: ${TELEGRAM_AUTH_GATEWAY_PROXY_PORT:-1080}
+      TELEGRAM_SOCKS5_PROXY_USERNAME: ${TELEGRAM_AUTH_GATEWAY_PROXY_USERNAME:-}
+      TELEGRAM_SOCKS5_PROXY_PASSWORD: ${TELEGRAM_AUTH_GATEWAY_PROXY_PASSWORD:-}
+    volumes:
+      - telegram_auth_gateway_data:/data
+
   frontend:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE must be set for production deployments}
     restart: unless-stopped
@@ -48,3 +69,4 @@ services:
 volumes:
   postgres_data:
   telegram_tdlib_data:
+  telegram_auth_gateway_data:

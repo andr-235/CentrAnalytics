@@ -46,6 +46,7 @@ Production Docker Compose now runs:
 - `postgres`
 - `app`
 - `frontend`
+- `telegram-auth-gateway`
 
 The public entrypoint is `frontend`, which serves the built Vite assets with `nginx` and proxies:
 
@@ -57,6 +58,22 @@ The public entrypoint is `frontend`, which serves the built Vite assets with `ng
 - `/v3/api-docs`
 
 This keeps the browser on one origin and removes the need for production CORS configuration between frontend and backend.
+
+`telegram-auth-gateway` is internal-only and is not published publicly. The Spring Boot app calls it over the Docker network for Telegram user authorization.
+
+Recommended `.env` values for gateway mode:
+
+```bash
+TELEGRAM_AUTH_GATEWAY_ENABLED=true
+TELEGRAM_AUTH_GATEWAY_BASE_URL=http://telegram-auth-gateway:8091
+TELEGRAM_AUTH_GATEWAY_CONNECT_TIMEOUT=5s
+TELEGRAM_AUTH_GATEWAY_READ_TIMEOUT=30s
+TELEGRAM_AUTH_GATEWAY_PROXY_ENABLED=false
+TELEGRAM_AUTH_GATEWAY_PROXY_HOST=
+TELEGRAM_AUTH_GATEWAY_PROXY_PORT=10808
+TELEGRAM_AUTH_GATEWAY_PROXY_USERNAME=
+TELEGRAM_AUTH_GATEWAY_PROXY_PASSWORD=
+```
 
 ## Wappi Webhooks
 

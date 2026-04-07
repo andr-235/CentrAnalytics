@@ -19,12 +19,12 @@ type IntegrationsPageProps = {
   startSession?: (token: string, phoneNumber: string) => Promise<TelegramActionResult>;
   submitCode?: (
     token: string,
-    sessionId: number,
+    sessionId: string,
     code: string
   ) => Promise<TelegramActionResult>;
   submitPassword?: (
     token: string,
-    sessionId: number,
+    sessionId: string,
     password: string
   ) => Promise<TelegramActionResult>;
 };
