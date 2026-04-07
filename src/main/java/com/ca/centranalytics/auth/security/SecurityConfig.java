@@ -56,7 +56,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api/integrations/webhooks/**"
                         ).permitAll()
-                        .requestMatchers("/api/admin/**", "/api/raw-events/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/integrations/**").authenticated()
+                        .requestMatchers("/api/raw-events/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint((request, response, authException) -> {

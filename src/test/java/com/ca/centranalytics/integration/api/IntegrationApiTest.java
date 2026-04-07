@@ -332,7 +332,19 @@ class IntegrationApiTest {
 
     @Test
     @WithMockUser(username = "reader", roles = "USER")
-    void forbidsAdminEndpointsForNonAdmins() throws Exception {
+    void allowsAuthenticatedUsersToOperateIntegrationsButKeepsRawEventsAdminOnly() throws Exception {
+        mockMvc.perform(get("/api/admin/integrations/vk/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].vkGroupId").value(1001));
+
+        mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"region":"Primorsky Krai","limit":25,"collectionMode":"HYBRID"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"));
+
         mockMvc.perform(get("/api/raw-events/{id}", rawEventId))
                 .andExpect(status().isForbidden());
     }
