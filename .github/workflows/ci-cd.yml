@@ -327,7 +327,19 @@ jobs:
           fi
 
           if [ -n "$services_to_pull" ]; then
-            docker compose -f compose.prod.yaml pull $services_to_pull
+            pull_attempt=1
+            pull_max_attempts=3
+
+            until docker compose -f compose.prod.yaml pull $services_to_pull; do
+              if [ "$pull_attempt" -ge "$pull_max_attempts" ]; then
+                echo "Failed to pull updated images after $pull_max_attempts attempts" >&2
+                exit 1
+              fi
+
+              echo "Image pull attempt $pull_attempt failed, retrying in 10 seconds..." >&2
+              pull_attempt=$((pull_attempt + 1))
+              sleep 10
+            done
           fi
 
           if [ -n "$services_to_up" ]; then
