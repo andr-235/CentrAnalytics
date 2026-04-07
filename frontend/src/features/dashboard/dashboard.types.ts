@@ -4,6 +4,7 @@ export type MessageRecord = {
   externalMessageId: string | null;
   conversationId: number | null;
   conversationTitle: string | null;
+  externalConversationId: string | null;
   conversationType: string | null;
   authorId: number | null;
   authorDisplayName: string | null;

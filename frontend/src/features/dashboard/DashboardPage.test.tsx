@@ -11,6 +11,7 @@ const messages: MessageRecord[] = [
     externalMessageId: "msg-12",
     conversationId: 701,
     conversationTitle: "Оперативный штаб",
+    externalConversationId: "chat-701",
     conversationType: "GROUP",
     authorId: 44,
     authorDisplayName: "Алексей Смирнов",
@@ -24,7 +25,8 @@ const messages: MessageRecord[] = [
     platform: "WHATSAPP",
     externalMessageId: "msg-13",
     conversationId: 702,
-    conversationTitle: "Муниципальный мониторинг",
+    conversationTitle: "Екатерина Волкова",
+    externalConversationId: "120363303652035579@g.us",
     conversationType: "GROUP",
     authorId: 45,
     authorDisplayName: "Екатерина Волкова",
@@ -112,5 +114,19 @@ describe("DashboardPage", () => {
     expect(screen.getByText("+79990001122")).toBeInTheDocument();
     expect(screen.getByText("Оперативный штаб")).toBeInTheDocument();
     expect(screen.getAllByText("GROUP")[0]).toBeInTheDocument();
+    expect(screen.getByText("120363303652035579@g.us")).toBeInTheDocument();
+  });
+
+  it("avoids duplicating the conversation title when it matches the author", async () => {
+    const loadMessages = vi.fn().mockResolvedValue({
+      ok: true as const,
+      items: [messages[1]]
+    });
+
+    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+
+    expect(await screen.findByText("Екатерина Волкова")).toBeInTheDocument();
+    expect(screen.getByText("GROUP")).toBeInTheDocument();
+    expect(screen.getByText("120363303652035579@g.us")).toBeInTheDocument();
   });
 });

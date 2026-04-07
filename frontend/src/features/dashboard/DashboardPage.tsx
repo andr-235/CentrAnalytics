@@ -43,11 +43,25 @@ function authorSecondary(item: MessageRecord) {
 }
 
 function conversationPrimary(item: MessageRecord) {
-  return item.conversationTitle || "Без названия";
+  const title = item.conversationTitle?.trim();
+  const author = item.authorDisplayName?.trim();
+
+  if (title && title !== author) {
+    return title;
+  }
+
+  return item.conversationType || "Диалог";
 }
 
 function conversationSecondary(item: MessageRecord) {
-  return item.conversationType || null;
+  const title = item.conversationTitle?.trim();
+  const author = item.authorDisplayName?.trim();
+
+  if (title && title !== author) {
+    return item.conversationType || item.externalConversationId || null;
+  }
+
+  return item.externalConversationId || null;
 }
 
 export function DashboardPage({

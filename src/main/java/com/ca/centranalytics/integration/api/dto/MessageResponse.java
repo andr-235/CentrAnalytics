@@ -11,6 +11,7 @@ public record MessageResponse(
         String externalMessageId,
         Long conversationId,
         String conversationTitle,
+        String externalConversationId,
         String conversationType,
         Long authorId,
         String authorDisplayName,

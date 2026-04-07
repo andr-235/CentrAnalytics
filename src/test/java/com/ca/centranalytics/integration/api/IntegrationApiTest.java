@@ -245,6 +245,7 @@ class IntegrationApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].externalMessageId").value("777"))
                 .andExpect(jsonPath("$[0].conversationTitle").value("Community chat"))
+                .andExpect(jsonPath("$[0].externalConversationId").value("2000000001"))
                 .andExpect(jsonPath("$[0].conversationType").value("GROUP"))
                 .andExpect(jsonPath("$[0].authorDisplayName").value("Ivan Ivanov"))
                 .andExpect(jsonPath("$[0].authorPhone").value("+79990000001"));
