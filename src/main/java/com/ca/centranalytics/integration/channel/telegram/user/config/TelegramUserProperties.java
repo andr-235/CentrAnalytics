@@ -12,6 +12,11 @@ public record TelegramUserProperties(
         String systemLanguageCode,
         String deviceModel,
         String systemVersion,
-        String applicationVersion
+        String applicationVersion,
+        boolean proxyEnabled,
+        String proxyHost,
+        int proxyPort,
+        String proxyUsername,
+        String proxyPassword
 ) {
 }

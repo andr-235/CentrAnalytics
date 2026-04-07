@@ -64,6 +64,7 @@ public class TelegramTdLibClientManager {
         builder.addUpdateHandler(TdApi.UpdateMessageEdited.class, update -> handleEditedMessage(session.getId(), update));
 
         runtime.client = builder.build(AuthenticationSupplier.user(session.getPhoneNumber()));
+        configureProxy(runtime.client);
         if (!session.isAuthorized()) {
             sessionService.updateState(session.getId(), TelegramUserSessionState.WAIT_CODE, null);
         }
@@ -223,6 +224,27 @@ public class TelegramTdLibClientManager {
         if (properties.apiId() <= 0 || !StringUtils.hasText(properties.apiHash())) {
             throw new TelegramUserModeDisabledException("Telegram user api-id and api-hash must be configured");
         }
+    }
+
+    private void configureProxy(SimpleTelegramClient client) {
+        if (!properties.proxyEnabled()) {
+            return;
+        }
+        if (!StringUtils.hasText(properties.proxyHost()) || properties.proxyPort() <= 0) {
+            throw new TelegramUserModeDisabledException("Telegram user proxy host and port must be configured");
+        }
+
+        TdApi.Proxy proxy = client.send(new TdApi.AddProxy(
+                properties.proxyHost().trim(),
+                properties.proxyPort(),
+                true,
+                new TdApi.ProxyTypeSocks5(
+                        StringUtils.hasText(properties.proxyUsername()) ? properties.proxyUsername() : "",
+                        StringUtils.hasText(properties.proxyPassword()) ? properties.proxyPassword() : ""
+                )
+        )).join();
+        client.send(new TdApi.EnableProxy(proxy.id)).join();
+        log.info("Configured Telegram TDLib SOCKS5 proxy {}:{}", properties.proxyHost(), properties.proxyPort());
     }
 
     private static final class ClientRuntime {
