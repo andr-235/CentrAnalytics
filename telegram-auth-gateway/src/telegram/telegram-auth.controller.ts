@@ -11,7 +11,7 @@ const startSessionSchema = z.object({
 const confirmSessionSchema = z.object({
   transactionId: z.string().min(1),
   code: z.string().min(1),
-  password: z.string().min(1).optional()
+  password: z.string().min(1).nullish()
 });
 
 export function registerTelegramAuthRoutes(
@@ -42,7 +42,7 @@ export function registerTelegramAuthRoutes(
       return await telegramAuthService.confirmSession(
         payload.transactionId,
         payload.code,
-        payload.password
+        payload.password ?? undefined
       );
     } catch (error) {
       return sendTelegramAuthError(reply, error);
