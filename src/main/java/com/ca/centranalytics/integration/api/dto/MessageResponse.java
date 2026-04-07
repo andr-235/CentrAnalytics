@@ -10,7 +10,11 @@ public record MessageResponse(
         Platform platform,
         String externalMessageId,
         Long conversationId,
+        String conversationTitle,
+        String conversationType,
         Long authorId,
+        String authorDisplayName,
+        String authorPhone,
         String text,
         MessageType messageType,
         Instant sentAt

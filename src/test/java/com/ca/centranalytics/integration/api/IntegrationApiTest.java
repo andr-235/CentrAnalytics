@@ -127,6 +127,7 @@ class IntegrationApiTest {
                 .externalUserId("123")
                 .displayName("Ivan Ivanov")
                 .username("ivan")
+                .phone("+79990000001")
                 .metadataJson("{}")
                 .build());
 
@@ -242,7 +243,11 @@ class IntegrationApiTest {
 
         mockMvc.perform(get("/api/messages").param("search", "hello"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].externalMessageId").value("777"));
+                .andExpect(jsonPath("$[0].externalMessageId").value("777"))
+                .andExpect(jsonPath("$[0].conversationTitle").value("Community chat"))
+                .andExpect(jsonPath("$[0].conversationType").value("GROUP"))
+                .andExpect(jsonPath("$[0].authorDisplayName").value("Ivan Ivanov"))
+                .andExpect(jsonPath("$[0].authorPhone").value("+79990000001"));
 
         mockMvc.perform(get("/api/messages/{id}", messageId))
                 .andExpect(status().isOk())

@@ -10,7 +10,11 @@ const messages: MessageRecord[] = [
     platform: "TELEGRAM",
     externalMessageId: "msg-12",
     conversationId: 701,
+    conversationTitle: "Оперативный штаб",
+    conversationType: "GROUP",
     authorId: 44,
+    authorDisplayName: "Алексей Смирнов",
+    authorPhone: "+79990001122",
     text: "Проверка аналитического пайплайна по воронке обращений",
     messageType: "TEXT",
     sentAt: "2026-04-07T02:15:00Z"
@@ -20,7 +24,11 @@ const messages: MessageRecord[] = [
     platform: "WHATSAPP",
     externalMessageId: "msg-13",
     conversationId: 702,
+    conversationTitle: "Муниципальный мониторинг",
+    conversationType: "GROUP",
     authorId: 45,
+    authorDisplayName: "Екатерина Волкова",
+    authorPhone: "+79990002233",
     text: "Нужен повторный обзвон группы риска",
     messageType: "TEXT",
     sentAt: "2026-04-07T03:20:00Z"
@@ -90,5 +98,19 @@ describe("DashboardPage", () => {
       "Тип",
       "Время"
     ]);
+  });
+
+  it("renders author and conversation labels instead of database ids", async () => {
+    const loadMessages = vi.fn().mockResolvedValue({
+      ok: true as const,
+      items: messages
+    });
+
+    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+
+    expect(await screen.findByText("Алексей Смирнов")).toBeInTheDocument();
+    expect(screen.getByText("+79990001122")).toBeInTheDocument();
+    expect(screen.getByText("Оперативный штаб")).toBeInTheDocument();
+    expect(screen.getAllByText("GROUP")[0]).toBeInTheDocument();
   });
 });

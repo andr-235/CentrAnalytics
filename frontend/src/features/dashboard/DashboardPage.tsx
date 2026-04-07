@@ -34,6 +34,22 @@ function platformLabel(value: string) {
   }
 }
 
+function authorPrimary(item: MessageRecord) {
+  return item.authorDisplayName || "Неизвестный автор";
+}
+
+function authorSecondary(item: MessageRecord) {
+  return item.authorPhone || null;
+}
+
+function conversationPrimary(item: MessageRecord) {
+  return item.conversationTitle || "Без названия";
+}
+
+function conversationSecondary(item: MessageRecord) {
+  return item.conversationType || null;
+}
+
 export function DashboardPage({
   token,
   loadMessages = fetchMessages
@@ -141,9 +157,21 @@ export function DashboardPage({
                     {platformLabel(item.platform)}
                   </span>
                 </td>
-                <td>{item.authorId ?? "System"}</td>
+                <td>
+                  <div className="table-meta">
+                    <strong>{authorPrimary(item)}</strong>
+                    {authorSecondary(item) ? <span>{authorSecondary(item)}</span> : null}
+                  </div>
+                </td>
                 <td className="message-cell">{item.text || "Без текста"}</td>
-                <td>{item.conversationId ?? "—"}</td>
+                <td>
+                  <div className="table-meta">
+                    <strong>{conversationPrimary(item)}</strong>
+                    {conversationSecondary(item) ? (
+                      <span>{conversationSecondary(item)}</span>
+                    ) : null}
+                  </div>
+                </td>
                 <td>{item.messageType}</td>
                 <td>{formatDateTime(item.sentAt)}</td>
               </tr>

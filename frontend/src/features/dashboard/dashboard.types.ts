@@ -3,7 +3,11 @@ export type MessageRecord = {
   platform: string;
   externalMessageId: string | null;
   conversationId: number | null;
+  conversationTitle: string | null;
+  conversationType: string | null;
   authorId: number | null;
+  authorDisplayName: string | null;
+  authorPhone: string | null;
   text: string | null;
   messageType: string;
   sentAt: string;
