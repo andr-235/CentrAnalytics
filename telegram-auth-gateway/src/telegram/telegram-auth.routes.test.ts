@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../app.js";
 import type { TelegramAuthService } from "./telegram-auth.service.js";
+import type { TelegramCollectorService } from "./telegram-collector.service.js";
 
 function createTelegramAuthServiceMock(): TelegramAuthService {
   return {
@@ -10,6 +11,18 @@ function createTelegramAuthServiceMock(): TelegramAuthService {
     getCurrentSession: vi.fn(),
     resetCurrentSession: vi.fn()
   } as unknown as TelegramAuthService;
+}
+
+function createTelegramCollectorServiceMock(): TelegramCollectorService {
+  return {
+    getStatus: vi.fn().mockReturnValue({
+      state: "STOPPED",
+      lastEventAt: null,
+      lastError: null,
+      selfUserId: null,
+      selfUsername: null
+    })
+  } as unknown as TelegramCollectorService;
 }
 
 describe("telegram auth routes", () => {
@@ -115,6 +128,31 @@ describe("telegram auth routes", () => {
       });
 
       expect(response.statusCode).toBe(204);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("returns collector status", async () => {
+    const telegramAuthService = createTelegramAuthServiceMock();
+    const telegramCollectorService = createTelegramCollectorServiceMock();
+
+    const app = createApp({ telegramAuthService, telegramCollectorService });
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/collector/status"
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        state: "STOPPED",
+        lastEventAt: null,
+        lastError: null,
+        selfUserId: null,
+        selfUsername: null
+      });
     } finally {
       await app.close();
     }

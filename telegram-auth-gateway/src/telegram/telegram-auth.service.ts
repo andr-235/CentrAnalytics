@@ -45,10 +45,22 @@ export interface TelegramGatewayClient {
 
 export type TelegramClientFactory = (session: string | null) => Promise<TelegramGatewayClient>;
 
+export interface TelegramSessionLifecycleHooks {
+  onSessionReady?(session: {
+    phoneNumber: string;
+    session: string;
+    userId: number;
+    username: string | null;
+    createdAt: string;
+  }): Promise<void>;
+  onSessionReset?(): Promise<void>;
+}
+
 export class TelegramAuthService {
   public constructor(
     private readonly repository: TelegramSessionRepository,
-    private readonly clientFactory: TelegramClientFactory
+    private readonly clientFactory: TelegramClientFactory,
+    private readonly lifecycleHooks: TelegramSessionLifecycleHooks = {}
   ) {}
 
   public async startSession(phoneNumber: string): Promise<StartSessionResponse> {
@@ -132,6 +144,7 @@ export class TelegramAuthService {
 
   public async resetCurrentSession(): Promise<void> {
     await this.repository.clearAll();
+    await this.lifecycleHooks.onSessionReset?.();
   }
 
   private async completeAuthorization(
@@ -150,6 +163,7 @@ export class TelegramAuthService {
 
     await this.repository.saveCurrentSession(current);
     await this.repository.deleteTransaction(transactionId);
+    await this.lifecycleHooks.onSessionReady?.(current);
 
     return {
       session,

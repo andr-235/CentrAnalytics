@@ -54,7 +54,8 @@ public class SecurityConfig {
                                 "/api-docs",
                                 "/api-docs/**",
                                 "/v3/api-docs/**",
-                                "/api/integrations/webhooks/**"
+                                "/api/integrations/webhooks/**",
+                                "/api/internal/integrations/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/integrations/**").authenticated()
                         .requestMatchers("/api/raw-events/**").hasRole("ADMIN")

@@ -10,7 +10,10 @@ const envSchema = z.object({
   TELEGRAM_SOCKS5_PROXY_HOST: z.string().default(""),
   TELEGRAM_SOCKS5_PROXY_PORT: z.coerce.number().int().positive().default(1080),
   TELEGRAM_SOCKS5_PROXY_USERNAME: z.string().optional(),
-  TELEGRAM_SOCKS5_PROXY_PASSWORD: z.string().optional()
+  TELEGRAM_SOCKS5_PROXY_PASSWORD: z.string().optional(),
+  BACKEND_INGESTION_BASE_URL: z.string().url(),
+  BACKEND_INGESTION_INTERNAL_TOKEN: z.string().min(1),
+  TELEGRAM_COLLECTOR_ENABLED: z.coerce.boolean().default(true)
 });
 
 export type Env = z.infer<typeof envSchema>;

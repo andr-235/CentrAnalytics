@@ -73,7 +73,22 @@ TELEGRAM_AUTH_GATEWAY_PROXY_HOST=
 TELEGRAM_AUTH_GATEWAY_PROXY_PORT=10808
 TELEGRAM_AUTH_GATEWAY_PROXY_USERNAME=
 TELEGRAM_AUTH_GATEWAY_PROXY_PASSWORD=
+TELEGRAM_COLLECTOR_ENABLED=true
+BACKEND_INGESTION_BASE_URL=http://app:8080
+TELEGRAM_GATEWAY_INGESTION_ENABLED=true
+TELEGRAM_GATEWAY_INGESTION_INTERNAL_TOKEN=replace-with-internal-token
 ```
+
+`telegram-auth-gateway` now has two roles:
+
+- Telegram user authorization over GramJS/MTProto
+- Telegram message collection from the saved `StringSession` with delivery into backend ingestion
+
+The backend exposes an internal-only Telegram ingestion endpoint for the gateway:
+
+- `POST /api/internal/integrations/telegram-user/events`
+
+It is intended only for trusted service-to-service calls inside the Docker network and must be protected with `X-Internal-Token`.
 
 ## Wappi Webhooks
 
