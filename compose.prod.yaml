@@ -42,8 +42,6 @@ services:
   telegram-auth-gateway:
     image: ${TELEGRAM_AUTH_GATEWAY_IMAGE:?TELEGRAM_AUTH_GATEWAY_IMAGE must be set for production deployments}
     restart: unless-stopped
-    depends_on:
-      - app
     env_file:
       - .env
     expose:
