@@ -15,6 +15,15 @@ export default function App() {
   );
   const [activeSection, setActiveSection] = useState<Section>("messages");
 
+  function clearSession() {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("centranalytics.token");
+    }
+
+    setToken("");
+    setActiveSection("messages");
+  }
+
   if (!token) {
     return <AuthPage onAuthenticated={setToken} />;
   }
@@ -22,9 +31,9 @@ export default function App() {
   return (
     <AppShell activeItem={activeSection} onNavigate={setActiveSection}>
       {activeSection === "messages" ? (
-        <DashboardPage token={token} />
+        <DashboardPage token={token} onUnauthorized={clearSession} />
       ) : activeSection === "integrations" ? (
-        <IntegrationsPage token={token} />
+        <IntegrationsPage token={token} onUnauthorized={clearSession} />
       ) : (
         <section className="placeholder-page">
           <p className="placeholder-page__eyebrow">Раздел в работе</p>

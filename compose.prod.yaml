@@ -39,9 +39,18 @@ services:
       TELEGRAM_USER_SYSTEM_VERSION: ${TELEGRAM_USER_SYSTEM_VERSION:-server}
       TELEGRAM_USER_APPLICATION_VERSION: ${TELEGRAM_USER_APPLICATION_VERSION:-1.0.0}
 
+  centranalytics-tgproxy:
+    image: ${TELEGRAM_PROXY_IMAGE:-ghcr.io/xtls/xray-core:latest}
+    restart: unless-stopped
+    command: ["run", "-c", "/etc/xray/config.json"]
+    volumes:
+      - ${TELEGRAM_PROXY_CONFIG_PATH:-./telegram-proxy/config.json}:/etc/xray/config.json:ro
+
   telegram-auth-gateway:
     image: ${TELEGRAM_AUTH_GATEWAY_IMAGE:?TELEGRAM_AUTH_GATEWAY_IMAGE must be set for production deployments}
     restart: unless-stopped
+    depends_on:
+      - centranalytics-tgproxy
     env_file:
       - .env
     expose:

@@ -34,8 +34,20 @@ export async function fetchMessages(
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        return {
+          ok: false as const,
+          unauthorized: true as const,
+          error:
+            data && typeof data.error === "string"
+              ? data.error
+              : "Сессия истекла. Выполните вход заново."
+        };
+      }
+
       return {
         ok: false as const,
+        unauthorized: false as const,
         error:
           data && typeof data.error === "string"
             ? data.error
@@ -50,6 +62,7 @@ export async function fetchMessages(
   } catch {
     return {
       ok: false as const,
+      unauthorized: false as const,
       error: "Сервер недоступен. Проверь backend и повтори запрос."
     };
   }

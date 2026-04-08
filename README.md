@@ -46,6 +46,7 @@ Production Docker Compose now runs:
 - `postgres`
 - `app`
 - `frontend`
+- `centranalytics-tgproxy`
 - `telegram-auth-gateway`
 
 The public entrypoint is `frontend`, which serves the built Vite assets with `nginx` and proxies:
@@ -60,6 +61,7 @@ The public entrypoint is `frontend`, which serves the built Vite assets with `ng
 This keeps the browser on one origin and removes the need for production CORS configuration between frontend and backend.
 
 `telegram-auth-gateway` is internal-only and is not published publicly. The Spring Boot app calls it over the Docker network for Telegram user authorization.
+`centranalytics-tgproxy` is the only supported Telegram egress proxy in production. It should be managed by `docker compose`, not by ad-hoc `xray` or `happ` processes.
 
 Recommended `.env` values for gateway mode:
 
@@ -68,6 +70,8 @@ TELEGRAM_AUTH_GATEWAY_ENABLED=true
 TELEGRAM_AUTH_GATEWAY_BASE_URL=http://telegram-auth-gateway:8091
 TELEGRAM_AUTH_GATEWAY_CONNECT_TIMEOUT=5s
 TELEGRAM_AUTH_GATEWAY_READ_TIMEOUT=30s
+TELEGRAM_PROXY_IMAGE=ghcr.io/xtls/xray-core:latest
+TELEGRAM_PROXY_CONFIG_PATH=./telegram-proxy/config.json
 TELEGRAM_AUTH_GATEWAY_PROXY_ENABLED=false
 TELEGRAM_AUTH_GATEWAY_PROXY_HOST=
 TELEGRAM_AUTH_GATEWAY_PROXY_PORT=10808
@@ -78,6 +82,15 @@ BACKEND_INGESTION_BASE_URL=http://app:8080
 TELEGRAM_GATEWAY_INGESTION_ENABLED=true
 TELEGRAM_GATEWAY_INGESTION_INTERNAL_TOKEN=replace-with-internal-token
 ```
+
+Create the proxy config file on the server at `${TELEGRAM_PROXY_CONFIG_PATH}` inside the deploy directory, for example:
+
+```bash
+mkdir -p /opt/centranalytics/telegram-proxy
+cp /path/to/working-xray-config.json /opt/centranalytics/telegram-proxy/config.json
+```
+
+After that, `docker compose` will restore the proxy automatically after reboot together with the rest of the stack.
 
 `telegram-auth-gateway` now has two roles:
 

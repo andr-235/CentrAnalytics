@@ -44,6 +44,14 @@ export async function fetchIntegrationsSnapshot(
         ? (telegramData as TelegramSessionRecord)
         : null;
 
+    if (telegramResponse.status === 401 || vkGroupsResponse.status === 401) {
+      return {
+        ok: false,
+        unauthorized: true,
+        error: "Сессия истекла. Выполните вход заново."
+      };
+    }
+
     if (!vkGroupsResponse.ok) {
       return {
         ok: false,
@@ -81,6 +89,17 @@ async function submitTelegramAction(
     const data = await readJson(response);
 
     if (!response.ok || !data || typeof data !== "object") {
+      if (response.status === 401) {
+        return {
+          ok: false,
+          unauthorized: true,
+          error:
+            data && typeof data.error === "string"
+              ? data.error
+              : "Сессия истекла. Выполните вход заново."
+        };
+      }
+
       return {
         ok: false,
         error:

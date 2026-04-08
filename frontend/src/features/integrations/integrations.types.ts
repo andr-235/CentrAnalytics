@@ -34,8 +34,8 @@ export type IntegrationsSnapshot = {
 
 export type IntegrationsResult =
   | { ok: true; data: IntegrationsSnapshot }
-  | { ok: false; error: string };
+  | { ok: false; error: string; unauthorized?: boolean };
 
 export type TelegramActionResult =
   | { ok: true; session: TelegramSessionRecord }
-  | { ok: false; error: string };
+  | { ok: false; error: string; unauthorized?: boolean };

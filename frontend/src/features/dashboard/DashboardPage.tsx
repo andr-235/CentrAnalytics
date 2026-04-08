@@ -6,6 +6,7 @@ import type { MessageRecord } from "./dashboard.types";
 type DashboardPageProps = {
   token: string;
   loadMessages?: typeof fetchMessages;
+  onUnauthorized?: () => void;
 };
 
 const platformOptions = ["ALL", "TELEGRAM", "WHATSAPP", "VK"];
@@ -99,7 +100,8 @@ function conversationSecondary(item: MessageRecord) {
 
 export function DashboardPage({
   token,
-  loadMessages = fetchMessages
+  loadMessages = fetchMessages,
+  onUnauthorized
 }: DashboardPageProps) {
   const [items, setItems] = useState<MessageRecord[]>([]);
   const [search, setSearch] = useState("");
@@ -117,6 +119,11 @@ export function DashboardPage({
     });
 
     if (!result.ok) {
+      if (result.unauthorized) {
+        onUnauthorized?.();
+        return;
+      }
+
       setItems([]);
       setError(result.error);
       setIsLoading(false);

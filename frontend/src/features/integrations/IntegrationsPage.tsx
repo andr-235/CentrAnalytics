@@ -27,6 +27,7 @@ type IntegrationsPageProps = {
     sessionId: string,
     password: string
   ) => Promise<TelegramActionResult>;
+  onUnauthorized?: () => void;
 };
 
 function formatDateTime(value: string | null) {
@@ -86,7 +87,8 @@ export function IntegrationsPage({
   loadSnapshot = fetchIntegrationsSnapshot,
   startSession = startTelegramSession,
   submitCode = submitTelegramCode,
-  submitPassword = submitTelegramPassword
+  submitPassword = submitTelegramPassword,
+  onUnauthorized
 }: IntegrationsPageProps) {
   const [telegramSession, setTelegramSession] = useState<TelegramSessionRecord | null>(null);
   const [vkGroups, setVkGroups] = useState<VkGroupRecord[]>([]);
@@ -104,6 +106,11 @@ export function IntegrationsPage({
     const result = await loadSnapshot(token);
 
     if (!result.ok) {
+      if (result.unauthorized) {
+        onUnauthorized?.();
+        return;
+      }
+
       setError(result.error);
       setTelegramSession(null);
       setVkGroups([]);
@@ -127,6 +134,11 @@ export function IntegrationsPage({
     setIsSubmitting(false);
 
     if (!result.ok) {
+      if (result.unauthorized) {
+        onUnauthorized?.();
+        return;
+      }
+
       setError(result.error);
       return;
     }
