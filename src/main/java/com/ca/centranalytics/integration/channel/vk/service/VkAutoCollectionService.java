@@ -3,7 +3,9 @@ package com.ca.centranalytics.integration.channel.vk.service;
 import com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
+import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
 import com.ca.centranalytics.integration.channel.vk.config.VkAutoCollectionProperties;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkWallPostSnapshotRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,8 +32,15 @@ public class VkAutoCollectionService {
                 properties.groupSearchLimit(),
                 properties.collectionMode()
         ));
+        vkCrawlCommandService.createUserSearchJob(new SearchVkUsersRequest(
+                properties.region(),
+                properties.groupSearchLimit(),
+                properties.collectionMode()
+        ));
 
-        vkGroupCandidateRepository.findAllByOrderByUpdatedAtDesc().forEach(group -> {
+        vkGroupCandidateRepository.findAllByOrderByUpdatedAtDesc().stream()
+                .filter(group -> group.getRegionMatchSource() != VkMatchSource.FALLBACK)
+                .forEach(group -> {
             Long groupId = group.getVkGroupId();
             vkCrawlCommandService.createGroupPostsJob(groupId, new CollectVkGroupPostsRequest(
                     properties.postLimit(),

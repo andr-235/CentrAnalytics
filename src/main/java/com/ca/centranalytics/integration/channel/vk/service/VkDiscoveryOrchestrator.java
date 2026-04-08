@@ -16,6 +16,7 @@ import com.ca.centranalytics.integration.channel.vk.domain.VkCommentSnapshot;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJob;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
 import com.ca.centranalytics.integration.channel.vk.domain.VkGroupCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.domain.VkUserCandidate;
 import com.ca.centranalytics.integration.channel.vk.domain.VkWallPostSnapshot;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
@@ -59,10 +60,10 @@ public class VkDiscoveryOrchestrator {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
 
         List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
-        List<VkGroupSearchResult> results = searchGroups(searchTerms, request.limit(), false);
+        List<GroupSearchHit> results = searchGroups(searchTerms, request.limit(), false);
         VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
         if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<VkGroupSearchResult> fallbackResults = searchGroups(searchTerms, request.limit(), true);
+            List<GroupSearchHit> fallbackResults = searchGroups(searchTerms, request.limit(), true);
             if (!fallbackResults.isEmpty()) {
                 results = fallbackResults;
                 method = VkCollectionMethod.FALLBACK;
@@ -70,13 +71,18 @@ public class VkDiscoveryOrchestrator {
         }
 
         VkCollectionMethod finalMethod = method;
-        int processed = results.stream()
-                .map(result -> vkOfficialGroupCandidateMapper.map(request.region(), result, finalMethod))
+        Map<Long, VkGroupCandidate> matchedCandidatesById = new LinkedHashMap<>();
+        results.stream()
+                .map(hit -> vkOfficialGroupCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
+                .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
+                .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkGroupId(), candidate));
+        List<VkGroupCandidate> matchedCandidates = matchedCandidatesById.values().stream()
+                .limit(request.limit())
                 .map(vkCandidatePersistenceService::upsertGroupCandidate)
-                .toList()
-                .size();
+                .toList();
+        int processed = matchedCandidates.size();
 
-        int warnings = results.isEmpty() ? 1 : 0;
+        int warnings = processed == 0 ? 1 : 0;
         vkCrawlJobService.update(job.getId(), current -> {
             current.setStatus(VkCrawlJobStatus.COMPLETED);
             current.setItemCount(processed);
@@ -89,10 +95,10 @@ public class VkDiscoveryOrchestrator {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
 
         List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
-        List<VkUserSearchResult> results = searchUsers(searchTerms, request.limit(), false);
+        List<UserSearchHit> results = searchUsers(searchTerms, request.limit(), false);
         VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
         if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<VkUserSearchResult> fallbackResults = searchUsers(searchTerms, request.limit(), true);
+            List<UserSearchHit> fallbackResults = searchUsers(searchTerms, request.limit(), true);
             if (!fallbackResults.isEmpty()) {
                 results = fallbackResults;
                 method = VkCollectionMethod.FALLBACK;
@@ -100,13 +106,18 @@ public class VkDiscoveryOrchestrator {
         }
 
         VkCollectionMethod finalMethod = method;
-        int processed = results.stream()
-                .map(result -> vkOfficialUserCandidateMapper.map(request.region(), result, finalMethod))
+        Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
+        results.stream()
+                .map(hit -> vkOfficialUserCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
+                .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
+                .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate));
+        List<VkUserCandidate> matchedCandidates = matchedCandidatesById.values().stream()
+                .limit(request.limit())
                 .map(vkCandidatePersistenceService::upsertUserCandidate)
-                .toList()
-                .size();
+                .toList();
+        int processed = matchedCandidates.size();
 
-        int warnings = results.isEmpty() ? 1 : 0;
+        int warnings = processed == 0 ? 1 : 0;
         vkCrawlJobService.update(job.getId(), current -> {
             current.setStatus(VkCrawlJobStatus.COMPLETED);
             current.setItemCount(processed);
@@ -118,7 +129,13 @@ public class VkDiscoveryOrchestrator {
     public void runGroupPostCollection(VkCrawlJob job, Long groupId, CollectVkGroupPostsRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
 
-        List<VkWallPostResult> results = vkOfficialClient.getGroupPosts(groupId, request.limit());
+        List<VkWallPostResult> results;
+        try {
+            results = vkOfficialClient.getGroupPosts(groupId, request.limit());
+        } catch (RuntimeException ex) {
+            finalizeJob(job.getId(), 0, 0, 1, 0);
+            return;
+        }
         VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
         if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
             List<VkWallPostResult> fallbackResults = vkFallbackClient.getGroupPosts(groupId, request.limit());
@@ -172,7 +189,13 @@ public class VkDiscoveryOrchestrator {
         int errors = 0;
 
         for (VkWallPostSnapshot wallPost : wallPosts) {
-            List<VkCommentResult> results = vkOfficialClient.getPostComments(wallPost.getOwnerId(), wallPost.getPostId(), request.limit());
+            List<VkCommentResult> results;
+            try {
+                results = vkOfficialClient.getPostComments(wallPost.getOwnerId(), wallPost.getPostId(), request.limit());
+            } catch (RuntimeException ex) {
+                errors++;
+                continue;
+            }
             VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
             if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
                 List<VkCommentResult> fallbackResults = vkFallbackClient.getPostComments(wallPost.getOwnerId(), wallPost.getPostId(), request.limit());
@@ -291,37 +314,37 @@ public class VkDiscoveryOrchestrator {
         return processedCount > 0 ? VkCrawlJobStatus.PARTIAL : VkCrawlJobStatus.FAILED;
     }
 
-    private List<VkGroupSearchResult> searchGroups(List<String> searchTerms, int limit, boolean useFallback) {
-        Map<Long, VkGroupSearchResult> results = new LinkedHashMap<>();
+    private List<GroupSearchHit> searchGroups(List<String> searchTerms, int limit, boolean useFallback) {
+        List<GroupSearchHit> results = new ArrayList<>();
         List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
         for (String searchTerm : effectiveTerms) {
             List<VkGroupSearchResult> termResults = useFallback
                     ? vkFallbackClient.searchGroups(searchTerm, limit)
                     : vkOfficialClient.searchGroups(searchTerm, limit);
             for (VkGroupSearchResult result : termResults) {
-                results.putIfAbsent(result.id(), result);
-                if (results.size() >= limit) {
-                    return List.copyOf(results.values());
-                }
+                results.add(new GroupSearchHit(searchTerm, result));
             }
         }
-        return List.copyOf(results.values());
+        return List.copyOf(results);
     }
 
-    private List<VkUserSearchResult> searchUsers(List<String> searchTerms, int limit, boolean useFallback) {
-        Map<Long, VkUserSearchResult> results = new LinkedHashMap<>();
+    private List<UserSearchHit> searchUsers(List<String> searchTerms, int limit, boolean useFallback) {
+        List<UserSearchHit> results = new ArrayList<>();
         List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
         for (String searchTerm : effectiveTerms) {
             List<VkUserSearchResult> termResults = useFallback
                     ? vkFallbackClient.searchUsers(searchTerm, limit)
                     : vkOfficialClient.searchUsers(searchTerm, limit);
             for (VkUserSearchResult result : termResults) {
-                results.putIfAbsent(result.id(), result);
-                if (results.size() >= limit) {
-                    return List.copyOf(results.values());
-                }
+                results.add(new UserSearchHit(searchTerm, result));
             }
         }
-        return List.copyOf(results.values());
+        return List.copyOf(results);
+    }
+
+    private record GroupSearchHit(String searchTerm, VkGroupSearchResult result) {
+    }
+
+    private record UserSearchHit(String searchTerm, VkUserSearchResult result) {
     }
 }

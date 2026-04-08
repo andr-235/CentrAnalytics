@@ -13,6 +13,7 @@ import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJob;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobType;
 import com.ca.centranalytics.integration.channel.vk.domain.VkGroupCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.domain.VkUserCandidate;
 import com.ca.centranalytics.integration.channel.vk.repository.VkCommentSnapshotRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkCrawlJobRepository;
@@ -66,6 +67,23 @@ class VkDiscoveryOrchestratorSearchTest {
     }
 
     @Test
+    void filtersOutFallbackGroupsFromRegionalSearch() {
+        SearchHarness harness = new SearchHarness();
+
+        harness.orchestrator.runGroupSearch(
+                harness.job(VkCrawlJobType.GROUP_SEARCH),
+                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.groupCandidates.values())
+                .extracting(VkGroupCandidate::getVkGroupId)
+                .containsExactly(5001L, 5002L);
+        assertThat(harness.groupCandidates.values())
+                .extracting(VkGroupCandidate::getRegionMatchSource)
+                .doesNotContain(VkMatchSource.FALLBACK);
+    }
+
+    @Test
     void expandsEaoIntoCityQueriesForUserSearchWithoutDuplicates() {
         SearchHarness harness = new SearchHarness();
 
@@ -82,9 +100,43 @@ class VkDiscoveryOrchestratorSearchTest {
         assertThat(harness.job.getProcessedCount()).isEqualTo(2);
     }
 
+    @Test
+    void filtersOutFallbackUsersFromRegionalSearch() {
+        SearchHarness harness = new SearchHarness();
+
+        harness.orchestrator.runUserSearch(
+                harness.job(VkCrawlJobType.USER_SEARCH),
+                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.userCandidates.values())
+                .extracting(VkUserCandidate::getVkUserId)
+                .containsExactly(7001L, 7002L);
+        assertThat(harness.userCandidates.values())
+                .extracting(VkUserCandidate::getRegionMatchSource)
+                .doesNotContain(VkMatchSource.FALLBACK);
+    }
+
+    @Test
+    void marksGroupPostJobFailedWhenOfficialApiThrows() {
+        SearchHarness harness = new SearchHarness();
+        harness.failGroupPosts = true;
+
+        harness.orchestrator.runGroupPostCollection(
+                harness.job(VkCrawlJobType.GROUP_POSTS),
+                5001L,
+                new com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest(10, "HYBRID")
+        );
+
+        assertThat(harness.job.getStatus()).isEqualTo(VkCrawlJobStatus.FAILED);
+        assertThat(harness.job.getErrorCount()).isEqualTo(1);
+        assertThat(harness.job.getProcessedCount()).isEqualTo(0);
+    }
+
     private static final class SearchHarness {
         private final Map<Long, VkGroupCandidate> groupCandidates = new LinkedHashMap<>();
         private final Map<Long, VkUserCandidate> userCandidates = new LinkedHashMap<>();
+        private boolean failGroupPosts;
         private VkCrawlJob job;
         private final VkDiscoveryOrchestrator orchestrator;
 
@@ -142,7 +194,8 @@ class VkDiscoveryOrchestratorSearchTest {
                     return switch (region) {
                         case "Биробиджан" -> List.of(
                                 new VkGroupSearchResult(5001L, "Биробиджан Новости", "birobidzhan_news", "Городские новости", "Биробиджан", "{\"id\":5001}"),
-                                new VkGroupSearchResult(5002L, "ЕАО Объявления", "eao_ads", "Региональные объявления", "Биробиджан", "{\"id\":5002}")
+                                new VkGroupSearchResult(5002L, "ЕАО Объявления", "eao_ads", "Региональные объявления", "Биробиджан", "{\"id\":5002}"),
+                                new VkGroupSearchResult(9001L, "Подслушано Абрамовка", "abramovka_chat", "Чужой регион", null, "{\"id\":9001}")
                         );
                         case "Облучье" -> List.of(
                                 new VkGroupSearchResult(5002L, "ЕАО Объявления", "eao_ads", "Региональные объявления", "Облучье", "{\"id\":5002}")
@@ -156,7 +209,8 @@ class VkDiscoveryOrchestratorSearchTest {
                     return switch (region) {
                         case "Биробиджан" -> List.of(
                                 new VkUserSearchResult(7001L, "Irina B.", "Irina", "B.", "id7001", "https://vk.com/id7001", "Биробиджан", "Биробиджан", null, 1, null, null, null, null, null, null, null, null, null, null, "{\"id\":7001}"),
-                                new VkUserSearchResult(7002L, "Pavel O.", "Pavel", "O.", "id7002", "https://vk.com/id7002", "Облучье", "Облучье", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7002}")
+                                new VkUserSearchResult(7002L, "Pavel O.", "Pavel", "O.", "id7002", "https://vk.com/id7002", "Облучье", "Облучье", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7002}"),
+                                new VkUserSearchResult(9901L, "Ivan A.", "Ivan", "A.", "id9901", "https://vk.com/id9901", null, null, null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":9901}")
                         );
                         case "Облучье" -> List.of(
                                 new VkUserSearchResult(7002L, "Pavel O.", "Pavel", "O.", "id7002", "https://vk.com/id7002", "Облучье", "Облучье", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7002}")
@@ -167,6 +221,9 @@ class VkDiscoveryOrchestratorSearchTest {
 
                 @Override
                 public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+                    if (failGroupPosts) {
+                        throw new IllegalStateException("VK SDK call failed");
+                    }
                     return List.of();
                 }
 
