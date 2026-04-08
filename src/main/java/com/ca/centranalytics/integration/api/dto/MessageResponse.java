@@ -15,6 +15,8 @@ public record MessageResponse(
         String conversationType,
         Long authorId,
         String authorDisplayName,
+        String authorUsername,
+        String authorExternalUserId,
         String authorPhone,
         String text,
         MessageType messageType,

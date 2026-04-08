@@ -248,7 +248,9 @@ class IntegrationApiTest {
                 .andExpect(jsonPath("$[0].externalConversationId").value("2000000001"))
                 .andExpect(jsonPath("$[0].conversationType").value("GROUP"))
                 .andExpect(jsonPath("$[0].authorDisplayName").value("Ivan Ivanov"))
-                .andExpect(jsonPath("$[0].authorPhone").value("+79990000001"));
+                .andExpect(jsonPath("$[0].authorPhone").value("+79990000001"))
+                .andExpect(jsonPath("$[0].authorUsername").value("ivan"))
+                .andExpect(jsonPath("$[0].authorExternalUserId").value("123"));
 
         mockMvc.perform(get("/api/messages/{id}", messageId))
                 .andExpect(status().isOk())

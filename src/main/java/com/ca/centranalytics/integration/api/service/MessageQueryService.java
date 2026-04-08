@@ -43,6 +43,8 @@ public class MessageQueryService {
                         message.getConversation().getType().name(),
                         message.getAuthor() == null ? null : message.getAuthor().getId(),
                         message.getAuthor() == null ? null : message.getAuthor().getDisplayName(),
+                        message.getAuthor() == null ? null : message.getAuthor().getUsername(),
+                        message.getAuthor() == null ? null : message.getAuthor().getExternalUserId(),
                         message.getAuthor() == null ? null : message.getAuthor().getPhone(),
                         message.getText(),
                         message.getMessageType(),

@@ -39,10 +39,35 @@ function authorPrimary(item: MessageRecord) {
 }
 
 function authorSecondary(item: MessageRecord) {
+  if (item.platform === "TELEGRAM") {
+    const username = item.authorUsername?.trim();
+    const externalUserId = item.authorExternalUserId?.trim();
+
+    if (username && externalUserId) {
+      return `@${username} · id ${externalUserId}`;
+    }
+
+    if (username) {
+      return `@${username}`;
+    }
+
+    if (item.authorPhone && externalUserId) {
+      return `${item.authorPhone} · id ${externalUserId}`;
+    }
+
+    if (externalUserId) {
+      return `id ${externalUserId}`;
+    }
+  }
+
   return item.authorPhone || null;
 }
 
 function conversationPrimary(item: MessageRecord) {
+  if (item.platform === "TELEGRAM") {
+    return item.conversationTitle?.trim() || item.externalConversationId || item.conversationType || "Диалог";
+  }
+
   const title = item.conversationTitle?.trim();
   const author = item.authorDisplayName?.trim();
 
@@ -54,6 +79,14 @@ function conversationPrimary(item: MessageRecord) {
 }
 
 function conversationSecondary(item: MessageRecord) {
+  if (item.platform === "TELEGRAM") {
+    if (item.conversationType && item.externalConversationId) {
+      return `${item.conversationType} · ${item.externalConversationId}`;
+    }
+
+    return item.conversationType || item.externalConversationId || null;
+  }
+
   const title = item.conversationTitle?.trim();
   const author = item.authorDisplayName?.trim();
 

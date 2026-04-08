@@ -15,6 +15,8 @@ const messages: MessageRecord[] = [
     conversationType: "GROUP",
     authorId: 44,
     authorDisplayName: "Алексей Смирнов",
+    authorUsername: "alex-smirnov",
+    authorExternalUserId: "675752815",
     authorPhone: "+79990001122",
     text: "Проверка аналитического пайплайна по воронке обращений",
     messageType: "TEXT",
@@ -30,6 +32,8 @@ const messages: MessageRecord[] = [
     conversationType: "GROUP",
     authorId: 45,
     authorDisplayName: "Екатерина Волкова",
+    authorUsername: null,
+    authorExternalUserId: null,
     authorPhone: "+79990002233",
     text: "Нужен повторный обзвон группы риска",
     messageType: "TEXT",
@@ -102,7 +106,7 @@ describe("DashboardPage", () => {
     ]);
   });
 
-  it("renders author and conversation labels instead of database ids", async () => {
+  it("renders telegram author username and external id together with the dialog title", async () => {
     const loadMessages = vi.fn().mockResolvedValue({
       ok: true as const,
       items: messages
@@ -111,9 +115,9 @@ describe("DashboardPage", () => {
     render(<DashboardPage token="token" loadMessages={loadMessages} />);
 
     expect(await screen.findByText("Алексей Смирнов")).toBeInTheDocument();
-    expect(screen.getByText("+79990001122")).toBeInTheDocument();
+    expect(screen.getByText("@alex-smirnov · id 675752815")).toBeInTheDocument();
     expect(screen.getByText("Оперативный штаб")).toBeInTheDocument();
-    expect(screen.getAllByText("GROUP")[0]).toBeInTheDocument();
+    expect(screen.getByText("GROUP · chat-701")).toBeInTheDocument();
     expect(screen.getByText("120363303652035579@g.us")).toBeInTheDocument();
   });
 
