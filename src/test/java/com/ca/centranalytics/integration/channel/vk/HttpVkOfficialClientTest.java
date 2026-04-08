@@ -38,6 +38,22 @@ class HttpVkOfficialClientTest {
     }
 
     @Test
+    void resolvesRegionalSearchTermsForEaoFromVkDatabase() {
+        RecordingTransportClient transportClient = new RecordingTransportClient();
+        HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
+                properties("vk-token", "vk-user-token", null),
+                new VkApiClient(transportClient)
+        );
+
+        var terms = client.resolveRegionalSearchTerms("Еврейская автономная область");
+
+        assertThat(terms).containsExactly("Биробиджан", "Облучье");
+        assertThat(transportClient.lastRequestByMethod.get("database.getRegions")).contains("q=%D0%95%D0%B2%D1%80%D0%B5%D0%B9%D1%81%D0%BA%D0%B0%D1%8F");
+        assertThat(transportClient.lastRequestByMethod.get("database.getCities")).contains("region_id=77");
+        assertThat(transportClient.lastRequestByMethod.get("database.getCities")).contains("need_all=1");
+    }
+
+    @Test
     void searchesUsersWithUserTokenAndBuildsProfileUrl() {
         RecordingTransportClient transportClient = new RecordingTransportClient();
         HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
@@ -195,6 +211,12 @@ class HttpVkOfficialClientTest {
                         """;
                 case "users.get" -> """
                         {"response":[{"id":2002,"first_name":"Ivan","last_name":"Ivanov","domain":"id2002","home_town":"Vladivostok","bdate":"10.10.1990","sex":2,"status":"online","last_seen":{"time":1712400000},"photo_200":"https://vk.com/images/2002.jpg","mobile_phone":"+79990000001","home_phone":"84232000000","site":"https://example.com","relation":1,"university_name":"FEFU","career":[{"company":"CA"}],"counters":{"friends":120}},{"id":3003,"first_name":"Petr","last_name":"Petrov","screen_name":"id3003","city":{"title":"Artem"},"career":[],"counters":{"followers":2}}]}
+                        """;
+                case "database.getRegions" -> """
+                        {"response":{"count":1,"items":[{"id":77,"title":"Еврейская автономная область"}]}}
+                        """;
+                case "database.getCities" -> """
+                        {"response":{"count":2,"items":[{"id":1,"title":"Биробиджан","region":"Еврейская автономная область"},{"id":2,"title":"Облучье","region":"Еврейская автономная область"}]}}
                         """;
                 default -> throw new IllegalStateException("Unexpected method: " + methodName);
             };

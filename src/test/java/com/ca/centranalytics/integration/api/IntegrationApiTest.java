@@ -372,6 +372,11 @@ class IntegrationApiTest {
         VkOfficialClient vkOfficialClient() {
             return new VkOfficialClient() {
                 @Override
+                public List<String> resolveRegionalSearchTerms(String region) {
+                    return List.of(region);
+                }
+
+                @Override
                 public List<VkGroupSearchResult> searchGroups(String region, int limit) {
                     return List.of(new VkGroupSearchResult(
                             1001L,

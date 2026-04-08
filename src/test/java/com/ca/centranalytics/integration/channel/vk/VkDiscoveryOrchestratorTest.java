@@ -136,6 +136,42 @@ class VkDiscoveryOrchestratorTest {
     }
 
     @Test
+    void expandsEaoIntoCityQueriesForGroupSearch() {
+        VkCrawlJob job = vkCrawlJobRepository.save(VkCrawlJob.builder()
+                .jobType(VkCrawlJobType.GROUP_SEARCH)
+                .status(VkCrawlJobStatus.CREATED)
+                .requestJson("{}")
+                .build());
+
+        vkDiscoveryOrchestrator.runGroupSearch(job, new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID"));
+
+        VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
+        assertThat(persisted.getItemCount()).isEqualTo(2);
+        assertThat(vkGroupCandidateRepository.findAll())
+                .extracting(candidate -> candidate.getVkGroupId())
+                .containsExactlyInAnyOrder(5001L, 5002L);
+    }
+
+    @Test
+    void expandsEaoIntoCityQueriesForUserSearchWithoutDuplicates() {
+        VkCrawlJob job = vkCrawlJobRepository.save(VkCrawlJob.builder()
+                .jobType(VkCrawlJobType.USER_SEARCH)
+                .status(VkCrawlJobStatus.CREATED)
+                .requestJson("{}")
+                .build());
+
+        vkDiscoveryOrchestrator.runUserSearch(job, new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID"));
+
+        VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
+        assertThat(persisted.getItemCount()).isEqualTo(2);
+        assertThat(vkUserCandidateRepository.findAll())
+                .extracting(candidate -> candidate.getVkUserId())
+                .containsExactlyInAnyOrder(7001L, 7002L);
+    }
+
+    @Test
     void collectsGroupPostsAndIngestsThemIntoIntegrationDomain() {
         VkCrawlJob job = vkCrawlJobRepository.save(VkCrawlJob.builder()
                 .jobType(VkCrawlJobType.GROUP_POSTS)
@@ -209,7 +245,47 @@ class VkDiscoveryOrchestratorTest {
         VkOfficialClient vkOfficialClient() {
             return new VkOfficialClient() {
                 @Override
+                public List<String> resolveRegionalSearchTerms(String region) {
+                    if ("Еврейская автономная область".equals(region)) {
+                        return List.of("Биробиджан", "Облучье");
+                    }
+                    return List.of(region);
+                }
+
+                @Override
                 public List<VkGroupSearchResult> searchGroups(String region, int limit) {
+                    if ("Биробиджан".equals(region)) {
+                        return List.of(
+                                new VkGroupSearchResult(
+                                        5001L,
+                                        "Биробиджан Новости",
+                                        "birobidzhan_news",
+                                        "Городские новости",
+                                        "Биробиджан",
+                                        "{\"id\":5001}"
+                                ),
+                                new VkGroupSearchResult(
+                                        5002L,
+                                        "ЕАО Объявления",
+                                        "eao_ads",
+                                        "Региональные объявления",
+                                        "Биробиджан",
+                                        "{\"id\":5002}"
+                                )
+                        );
+                    }
+                    if ("Облучье".equals(region)) {
+                        return List.of(
+                                new VkGroupSearchResult(
+                                        5002L,
+                                        "ЕАО Объявления",
+                                        "eao_ads",
+                                        "Региональные объявления",
+                                        "Биробиджан",
+                                        "{\"id\":5002}"
+                                )
+                        );
+                    }
                     return List.of(new VkGroupSearchResult(
                             1001L,
                             "Primorye Group",
@@ -222,6 +298,81 @@ class VkDiscoveryOrchestratorTest {
 
                 @Override
                 public List<VkUserSearchResult> searchUsers(String region, int limit) {
+                    if ("Биробиджан".equals(region)) {
+                        return List.of(
+                                new VkUserSearchResult(
+                                        7001L,
+                                        "Irina B.",
+                                        "Irina",
+                                        "B.",
+                                        "id7001",
+                                        "https://vk.com/id7001",
+                                        "Биробиджан",
+                                        "Биробиджан",
+                                        null,
+                                        1,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "{\"id\":7001}"
+                                ),
+                                new VkUserSearchResult(
+                                        7002L,
+                                        "Pavel O.",
+                                        "Pavel",
+                                        "O.",
+                                        "id7002",
+                                        "https://vk.com/id7002",
+                                        "Облучье",
+                                        "Облучье",
+                                        null,
+                                        2,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "{\"id\":7002}"
+                                )
+                        );
+                    }
+                    if ("Облучье".equals(region)) {
+                        return List.of(new VkUserSearchResult(
+                                7002L,
+                                "Pavel O.",
+                                "Pavel",
+                                "O.",
+                                "id7002",
+                                "https://vk.com/id7002",
+                                "Облучье",
+                                "Облучье",
+                                null,
+                                2,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "{\"id\":7002}"
+                        ));
+                    }
                     return List.of();
                 }
 

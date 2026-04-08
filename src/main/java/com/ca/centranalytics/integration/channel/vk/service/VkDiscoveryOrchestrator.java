@@ -58,10 +58,11 @@ public class VkDiscoveryOrchestrator {
     public void runGroupSearch(VkCrawlJob job, SearchVkGroupsRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
 
-        List<VkGroupSearchResult> results = vkOfficialClient.searchGroups(request.region(), request.limit());
+        List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
+        List<VkGroupSearchResult> results = searchGroups(searchTerms, request.limit(), false);
         VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
         if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<VkGroupSearchResult> fallbackResults = vkFallbackClient.searchGroups(request.region(), request.limit());
+            List<VkGroupSearchResult> fallbackResults = searchGroups(searchTerms, request.limit(), true);
             if (!fallbackResults.isEmpty()) {
                 results = fallbackResults;
                 method = VkCollectionMethod.FALLBACK;
@@ -87,10 +88,11 @@ public class VkDiscoveryOrchestrator {
     public void runUserSearch(VkCrawlJob job, SearchVkUsersRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
 
-        List<VkUserSearchResult> results = vkOfficialClient.searchUsers(request.region(), request.limit());
+        List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
+        List<VkUserSearchResult> results = searchUsers(searchTerms, request.limit(), false);
         VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
         if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<VkUserSearchResult> fallbackResults = vkFallbackClient.searchUsers(request.region(), request.limit());
+            List<VkUserSearchResult> fallbackResults = searchUsers(searchTerms, request.limit(), true);
             if (!fallbackResults.isEmpty()) {
                 results = fallbackResults;
                 method = VkCollectionMethod.FALLBACK;
@@ -287,5 +289,39 @@ public class VkDiscoveryOrchestrator {
             return VkCrawlJobStatus.COMPLETED;
         }
         return processedCount > 0 ? VkCrawlJobStatus.PARTIAL : VkCrawlJobStatus.FAILED;
+    }
+
+    private List<VkGroupSearchResult> searchGroups(List<String> searchTerms, int limit, boolean useFallback) {
+        Map<Long, VkGroupSearchResult> results = new LinkedHashMap<>();
+        List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
+        for (String searchTerm : effectiveTerms) {
+            List<VkGroupSearchResult> termResults = useFallback
+                    ? vkFallbackClient.searchGroups(searchTerm, limit)
+                    : vkOfficialClient.searchGroups(searchTerm, limit);
+            for (VkGroupSearchResult result : termResults) {
+                results.putIfAbsent(result.id(), result);
+                if (results.size() >= limit) {
+                    return List.copyOf(results.values());
+                }
+            }
+        }
+        return List.copyOf(results.values());
+    }
+
+    private List<VkUserSearchResult> searchUsers(List<String> searchTerms, int limit, boolean useFallback) {
+        Map<Long, VkUserSearchResult> results = new LinkedHashMap<>();
+        List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
+        for (String searchTerm : effectiveTerms) {
+            List<VkUserSearchResult> termResults = useFallback
+                    ? vkFallbackClient.searchUsers(searchTerm, limit)
+                    : vkOfficialClient.searchUsers(searchTerm, limit);
+            for (VkUserSearchResult result : termResults) {
+                results.putIfAbsent(result.id(), result);
+                if (results.size() >= limit) {
+                    return List.copyOf(results.values());
+                }
+            }
+        }
+        return List.copyOf(results.values());
     }
 }

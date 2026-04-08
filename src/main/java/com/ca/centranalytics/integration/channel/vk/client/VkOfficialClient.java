@@ -8,6 +8,7 @@ import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import java.util.List;
 
 public interface VkOfficialClient {
+    List<String> resolveRegionalSearchTerms(String region);
     List<VkGroupSearchResult> searchGroups(String region, int limit);
     List<VkUserSearchResult> searchUsers(String region, int limit);
     List<VkWallPostResult> getGroupPosts(Long groupId, int limit);

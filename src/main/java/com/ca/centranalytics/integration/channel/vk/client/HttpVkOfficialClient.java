@@ -12,6 +12,10 @@ import com.vk.api.sdk.client.actors.UserActor;
 import com.vk.api.sdk.exceptions.ApiException;
 import com.vk.api.sdk.exceptions.ClientException;
 import com.vk.api.sdk.httpclient.HttpTransportClient;
+import com.vk.api.sdk.objects.database.City;
+import com.vk.api.sdk.objects.database.Region;
+import com.vk.api.sdk.objects.database.responses.GetCitiesResponse;
+import com.vk.api.sdk.objects.database.responses.GetRegionsResponse;
 import com.vk.api.sdk.objects.groups.GroupFull;
 import com.vk.api.sdk.objects.groups.SearchType;
 import com.vk.api.sdk.objects.groups.responses.SearchResponse;
@@ -27,13 +31,18 @@ import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class HttpVkOfficialClient implements VkOfficialClient {
 
     private static final long SDK_ACTOR_ID = 1L;
+    private static final String EAO_REGION = "Еврейская автономная область";
+    private static final int VK_DATABASE_PAGE_SIZE = 1000;
 
     private final VkProperties vkProperties;
     private final VkApiClient vkApiClient;
@@ -50,6 +59,51 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     HttpVkOfficialClient(VkProperties vkProperties, VkApiClient vkApiClient) {
         this.vkProperties = vkProperties;
         this.vkApiClient = vkApiClient;
+    }
+
+    @Override
+    public List<String> resolveRegionalSearchTerms(String region) {
+        if (!StringUtils.hasText(region)) {
+            return List.of();
+        }
+        if (!isEaoRegion(region)) {
+            return List.of(region);
+        }
+
+        Integer regionId = resolveRegionId(region);
+        if (regionId == null) {
+            return List.of(region);
+        }
+
+        Set<String> searchTerms = new LinkedHashSet<>();
+        int offset = 0;
+        while (true) {
+            int currentOffset = offset;
+            GetCitiesResponse response = execute(() -> vkApiClient.database()
+                    .getCities(userActorForUserCalls())
+                    .regionId(regionId)
+                    .needAll(true)
+                    .offset(currentOffset)
+                    .count(VK_DATABASE_PAGE_SIZE)
+                    .execute());
+
+            List<City> cities = response.getItems();
+            if (cities == null || cities.isEmpty()) {
+                break;
+            }
+
+            cities.stream()
+                    .map(City::getTitle)
+                    .filter(StringUtils::hasText)
+                    .forEach(searchTerms::add);
+
+            offset += cities.size();
+            if (cities.size() < VK_DATABASE_PAGE_SIZE) {
+                break;
+            }
+        }
+
+        return searchTerms.isEmpty() ? List.of(region) : List.copyOf(searchTerms);
     }
 
     @Override
@@ -198,6 +252,24 @@ public class HttpVkOfficialClient implements VkOfficialClient {
         return new UserActor(SDK_ACTOR_ID, userAccessToken());
     }
 
+    private Integer resolveRegionId(String region) {
+        GetRegionsResponse response = execute(() -> vkApiClient.database()
+                .getRegions(userActorForUserCalls())
+                .q(region)
+                .count(VK_DATABASE_PAGE_SIZE)
+                .execute());
+
+        if (response.getItems() == null) {
+            return null;
+        }
+
+        return response.getItems().stream()
+                .filter(candidate -> isSameRegionTitle(region, candidate))
+                .map(Region::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
     private String officialAccessToken() {
         if (!StringUtils.hasText(vkProperties.accessToken())) {
             throw new IllegalStateException("integration.vk.access-token is required for VK API calls");
@@ -258,6 +330,21 @@ public class HttpVkOfficialClient implements VkOfficialClient {
 
     private Long positiveOrNull(Long value) {
         return value != null && value > 0 ? value : null;
+    }
+
+    private boolean isEaoRegion(String region) {
+        return normalize(region).equals(normalize(EAO_REGION));
+    }
+
+    private boolean isSameRegionTitle(String requestedRegion, Region candidate) {
+        return candidate != null
+                && candidate.getId() != null
+                && StringUtils.hasText(candidate.getTitle())
+                && normalize(candidate.getTitle()).equals(normalize(requestedRegion));
+    }
+
+    private String normalize(String value) {
+        return value.toLowerCase(Locale.ROOT).replace('ё', 'е').trim();
     }
 
     @FunctionalInterface
