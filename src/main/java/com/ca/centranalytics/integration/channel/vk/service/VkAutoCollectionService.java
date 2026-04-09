@@ -12,17 +12,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongConsumer;
 
 @Service
 public class VkAutoCollectionService {
-    private static final long USER_SEARCH_STAGE_DELAY_MS = 45_000L;
-
     private final VkAutoCollectionProperties properties;
     private final VkCrawlCommandService vkCrawlCommandService;
     private final VkGroupCandidateRepository vkGroupCandidateRepository;
     private final VkWallPostSnapshotRepository vkWallPostSnapshotRepository;
     private final LongConsumer delayStrategy;
+    private final AtomicBoolean runUserDiscoveryNext = new AtomicBoolean(false);
 
     @Autowired
     public VkAutoCollectionService(
@@ -31,7 +31,8 @@ public class VkAutoCollectionService {
             VkGroupCandidateRepository vkGroupCandidateRepository,
             VkWallPostSnapshotRepository vkWallPostSnapshotRepository
     ) {
-        this(properties, vkCrawlCommandService, vkGroupCandidateRepository, vkWallPostSnapshotRepository, VkAutoCollectionService::sleep);
+        this(properties, vkCrawlCommandService, vkGroupCandidateRepository, vkWallPostSnapshotRepository, millis -> {
+        });
     }
 
     public VkAutoCollectionService(
@@ -53,17 +54,20 @@ public class VkAutoCollectionService {
             return;
         }
 
-        vkCrawlCommandService.createGroupSearchJob(new SearchVkGroupsRequest(
-                properties.region(),
-                properties.groupSearchLimit(),
-                properties.collectionMode()
-        ));
-        delayStrategy.accept(USER_SEARCH_STAGE_DELAY_MS);
-        vkCrawlCommandService.createUserSearchJob(new SearchVkUsersRequest(
-                properties.region(),
-                properties.groupSearchLimit(),
-                properties.collectionMode()
-        ));
+        boolean runUserDiscovery = runUserDiscoveryNext.getAndSet(!runUserDiscoveryNext.get());
+        if (runUserDiscovery) {
+            vkCrawlCommandService.createUserSearchJob(new SearchVkUsersRequest(
+                    properties.region(),
+                    properties.groupSearchLimit(),
+                    properties.collectionMode()
+            ));
+        } else {
+            vkCrawlCommandService.createGroupSearchJob(new SearchVkGroupsRequest(
+                    properties.region(),
+                    properties.groupSearchLimit(),
+                    properties.collectionMode()
+            ));
+        }
 
         vkGroupCandidateRepository.findAllByOrderByUpdatedAtDesc().stream()
                 .filter(group -> group.getRegionMatchSource() != VkMatchSource.FALLBACK)
@@ -87,14 +91,5 @@ public class VkAutoCollectionService {
                 ));
             }
         });
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("VK auto-collection interrupted", ex);
-        }
     }
 }

@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class VkAutoCollectionServiceTest {
 
     @Test
-    void runsSearchThenCollectsPostsAndCommentsForRegionalGroups() {
+    void alternatesDiscoveryStagesWhileCollectingPostsAndCommentsForRegionalGroups() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
                 new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
@@ -40,15 +40,22 @@ class VkAutoCollectionServiceTest {
         );
 
         service.collect();
+        service.collect();
 
         assertThat(vkCrawlCommandService.searchRequests)
                 .containsExactly(new SearchVkGroupsRequest("Primorsky Krai", 25, "HYBRID"));
         assertThat(vkCrawlCommandService.userSearchRequests)
                 .containsExactly(new SearchVkUsersRequest("Primorsky Krai", 25, "HYBRID"));
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(
+                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")),
+                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID"))
+                );
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"));
+                .containsExactly(
+                        new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"),
+                        new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID")
+                );
     }
 
     @Test
