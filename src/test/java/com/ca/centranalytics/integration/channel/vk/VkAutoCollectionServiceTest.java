@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class VkAutoCollectionServiceTest {
 
     @Test
-    void alternatesDiscoveryStagesWhileCollectingPostsAndCommentsForRegionalGroups() {
+    void runsGroupDiscoveryWhileCollectingPostsAndCommentsForRegionalGroups() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
                 new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
@@ -35,27 +35,18 @@ class VkAutoCollectionServiceTest {
                 wallPostRepository(List.of(
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3004L).build()
-                )),
-                millis -> {}
+                ))
         );
 
-        service.collect();
         service.collect();
 
         assertThat(vkCrawlCommandService.searchRequests)
                 .containsExactly(new SearchVkGroupsRequest("Primorsky Krai", 25, "HYBRID"));
-        assertThat(vkCrawlCommandService.userSearchRequests)
-                .containsExactly(new SearchVkUsersRequest("Primorsky Krai", 25, "HYBRID"));
+        assertThat(vkCrawlCommandService.userSearchRequests).isEmpty();
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(
-                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")),
-                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID"))
-                );
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(
-                        new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"),
-                        new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID")
-                );
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"));
     }
 
     @Test
@@ -68,8 +59,7 @@ class VkAutoCollectionServiceTest {
                         VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build(),
                         VkGroupCandidate.builder().vkGroupId(2002L).regionMatchSource(VkMatchSource.FALLBACK).build()
                 )),
-                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build())),
-                millis -> {}
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
         );
 
         service.collect();
@@ -87,8 +77,7 @@ class VkAutoCollectionServiceTest {
                 new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
-                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build())),
-                millis -> {}
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
         );
 
         service.collect();
