@@ -133,10 +133,26 @@ class VkDiscoveryOrchestratorSearchTest {
         assertThat(harness.job.getProcessedCount()).isEqualTo(0);
     }
 
+    @Test
+    void marksUserSearchJobFailedWhenOfficialApiThrows() {
+        SearchHarness harness = new SearchHarness();
+        harness.failUserSearch = true;
+
+        harness.orchestrator.runUserSearch(
+                harness.job(VkCrawlJobType.USER_SEARCH),
+                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.job.getStatus()).isEqualTo(VkCrawlJobStatus.FAILED);
+        assertThat(harness.job.getErrorCount()).isEqualTo(1);
+        assertThat(harness.job.getProcessedCount()).isEqualTo(0);
+    }
+
     private static final class SearchHarness {
         private final Map<Long, VkGroupCandidate> groupCandidates = new LinkedHashMap<>();
         private final Map<Long, VkUserCandidate> userCandidates = new LinkedHashMap<>();
         private boolean failGroupPosts;
+        private boolean failUserSearch;
         private VkCrawlJob job;
         private final VkDiscoveryOrchestrator orchestrator;
 
@@ -206,6 +222,9 @@ class VkDiscoveryOrchestratorSearchTest {
 
                 @Override
                 public List<VkUserSearchResult> searchUsers(String region, int limit) {
+                    if (failUserSearch) {
+                        throw new IllegalStateException("VK SDK call failed");
+                    }
                     return switch (region) {
                         case "Биробиджан" -> List.of(
                                 new VkUserSearchResult(7001L, "Irina B.", "Irina", "B.", "id7001", "https://vk.com/id7001", "Биробиджан", "Биробиджан", null, 1, null, null, null, null, null, null, null, null, null, null, "{\"id\":7001}"),

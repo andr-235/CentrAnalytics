@@ -58,72 +58,78 @@ public class VkDiscoveryOrchestrator {
 
     public void runGroupSearch(VkCrawlJob job, SearchVkGroupsRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
-
-        List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
-        List<GroupSearchHit> results = searchGroups(searchTerms, request.limit(), false);
-        VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
-        if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<GroupSearchHit> fallbackResults = searchGroups(searchTerms, request.limit(), true);
-            if (!fallbackResults.isEmpty()) {
-                results = fallbackResults;
-                method = VkCollectionMethod.FALLBACK;
+        try {
+            List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
+            List<GroupSearchHit> results = searchGroups(searchTerms, request.limit(), false);
+            VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
+            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
+                List<GroupSearchHit> fallbackResults = searchGroups(searchTerms, request.limit(), true);
+                if (!fallbackResults.isEmpty()) {
+                    results = fallbackResults;
+                    method = VkCollectionMethod.FALLBACK;
+                }
             }
+
+            VkCollectionMethod finalMethod = method;
+            Map<Long, VkGroupCandidate> matchedCandidatesById = new LinkedHashMap<>();
+            results.stream()
+                    .map(hit -> vkOfficialGroupCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
+                    .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
+                    .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkGroupId(), candidate));
+            List<VkGroupCandidate> matchedCandidates = matchedCandidatesById.values().stream()
+                    .limit(request.limit())
+                    .map(vkCandidatePersistenceService::upsertGroupCandidate)
+                    .toList();
+            int processed = matchedCandidates.size();
+
+            int warnings = processed == 0 ? 1 : 0;
+            vkCrawlJobService.update(job.getId(), current -> {
+                current.setStatus(VkCrawlJobStatus.COMPLETED);
+                current.setItemCount(processed);
+                current.setProcessedCount(processed);
+                current.setWarningCount(warnings);
+            });
+        } catch (RuntimeException ex) {
+            finalizeJob(job.getId(), 0, 0, 1, 0);
         }
-
-        VkCollectionMethod finalMethod = method;
-        Map<Long, VkGroupCandidate> matchedCandidatesById = new LinkedHashMap<>();
-        results.stream()
-                .map(hit -> vkOfficialGroupCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
-                .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
-                .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkGroupId(), candidate));
-        List<VkGroupCandidate> matchedCandidates = matchedCandidatesById.values().stream()
-                .limit(request.limit())
-                .map(vkCandidatePersistenceService::upsertGroupCandidate)
-                .toList();
-        int processed = matchedCandidates.size();
-
-        int warnings = processed == 0 ? 1 : 0;
-        vkCrawlJobService.update(job.getId(), current -> {
-            current.setStatus(VkCrawlJobStatus.COMPLETED);
-            current.setItemCount(processed);
-            current.setProcessedCount(processed);
-            current.setWarningCount(warnings);
-        });
     }
 
     public void runUserSearch(VkCrawlJob job, SearchVkUsersRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
-
-        List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
-        List<UserSearchHit> results = searchUsers(searchTerms, request.limit(), false);
-        VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
-        if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-            List<UserSearchHit> fallbackResults = searchUsers(searchTerms, request.limit(), true);
-            if (!fallbackResults.isEmpty()) {
-                results = fallbackResults;
-                method = VkCollectionMethod.FALLBACK;
+        try {
+            List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
+            List<UserSearchHit> results = searchUsers(searchTerms, request.limit(), false);
+            VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
+            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
+                List<UserSearchHit> fallbackResults = searchUsers(searchTerms, request.limit(), true);
+                if (!fallbackResults.isEmpty()) {
+                    results = fallbackResults;
+                    method = VkCollectionMethod.FALLBACK;
+                }
             }
+
+            VkCollectionMethod finalMethod = method;
+            Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
+            results.stream()
+                    .map(hit -> vkOfficialUserCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
+                    .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
+                    .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate));
+            List<VkUserCandidate> matchedCandidates = matchedCandidatesById.values().stream()
+                    .limit(request.limit())
+                    .map(vkCandidatePersistenceService::upsertUserCandidate)
+                    .toList();
+            int processed = matchedCandidates.size();
+
+            int warnings = processed == 0 ? 1 : 0;
+            vkCrawlJobService.update(job.getId(), current -> {
+                current.setStatus(VkCrawlJobStatus.COMPLETED);
+                current.setItemCount(processed);
+                current.setProcessedCount(processed);
+                current.setWarningCount(warnings);
+            });
+        } catch (RuntimeException ex) {
+            finalizeJob(job.getId(), 0, 0, 1, 0);
         }
-
-        VkCollectionMethod finalMethod = method;
-        Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
-        results.stream()
-                .map(hit -> vkOfficialUserCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
-                .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
-                .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate));
-        List<VkUserCandidate> matchedCandidates = matchedCandidatesById.values().stream()
-                .limit(request.limit())
-                .map(vkCandidatePersistenceService::upsertUserCandidate)
-                .toList();
-        int processed = matchedCandidates.size();
-
-        int warnings = processed == 0 ? 1 : 0;
-        vkCrawlJobService.update(job.getId(), current -> {
-            current.setStatus(VkCrawlJobStatus.COMPLETED);
-            current.setItemCount(processed);
-            current.setProcessedCount(processed);
-            current.setWarningCount(warnings);
-        });
     }
 
     public void runGroupPostCollection(VkCrawlJob job, Long groupId, CollectVkGroupPostsRequest request) {

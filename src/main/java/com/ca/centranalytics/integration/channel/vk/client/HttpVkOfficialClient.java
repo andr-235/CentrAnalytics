@@ -43,6 +43,9 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     private static final long SDK_ACTOR_ID = 1L;
     private static final String EAO_REGION = "Еврейская автономная область";
     private static final int VK_DATABASE_PAGE_SIZE = 1000;
+    private static final int FLOOD_CONTROL_ERROR_CODE = 9;
+    private static final int FLOOD_CONTROL_RETRY_ATTEMPTS = 3;
+    private static final long FLOOD_CONTROL_RETRY_DELAY_MS = 1_000L;
 
     private final VkProperties vkProperties;
     private final VkApiClient vkApiClient;
@@ -302,10 +305,32 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     }
 
     private <T> T execute(VkSdkCall<T> call) {
+        for (int attempt = 1; attempt <= FLOOD_CONTROL_RETRY_ATTEMPTS; attempt++) {
+            try {
+                return call.execute();
+            } catch (ApiException ex) {
+                if (isFloodControl(ex) && attempt < FLOOD_CONTROL_RETRY_ATTEMPTS) {
+                    sleepBeforeRetry(attempt);
+                    continue;
+                }
+                throw new IllegalStateException("VK SDK call failed", ex);
+            } catch (ClientException ex) {
+                throw new IllegalStateException("VK SDK call failed", ex);
+            }
+        }
+        throw new IllegalStateException("VK SDK call failed");
+    }
+
+    private boolean isFloodControl(ApiException ex) {
+        return ex.getCode() != null && ex.getCode() == FLOOD_CONTROL_ERROR_CODE;
+    }
+
+    private void sleepBeforeRetry(int attempt) {
         try {
-            return call.execute();
-        } catch (ApiException | ClientException ex) {
-            throw new IllegalStateException("VK SDK call failed", ex);
+            Thread.sleep(FLOOD_CONTROL_RETRY_DELAY_MS * attempt);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("VK retry interrupted", ex);
         }
     }
 
