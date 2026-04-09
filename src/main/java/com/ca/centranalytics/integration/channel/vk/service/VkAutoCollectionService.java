@@ -8,6 +8,7 @@ import com.ca.centranalytics.integration.channel.vk.config.VkAutoCollectionPrope
 import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkWallPostSnapshotRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +24,7 @@ public class VkAutoCollectionService {
     private final VkWallPostSnapshotRepository vkWallPostSnapshotRepository;
     private final LongConsumer delayStrategy;
 
+    @Autowired
     public VkAutoCollectionService(
             VkAutoCollectionProperties properties,
             VkCrawlCommandService vkCrawlCommandService,
