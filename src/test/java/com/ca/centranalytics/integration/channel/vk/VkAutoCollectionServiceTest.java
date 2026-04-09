@@ -35,7 +35,8 @@ class VkAutoCollectionServiceTest {
                 wallPostRepository(List.of(
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3004L).build()
-                ))
+                )),
+                millis -> {}
         );
 
         service.collect();
@@ -60,7 +61,8 @@ class VkAutoCollectionServiceTest {
                         VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build(),
                         VkGroupCandidate.builder().vkGroupId(2002L).regionMatchSource(VkMatchSource.FALLBACK).build()
                 )),
-                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build())),
+                millis -> {}
         );
 
         service.collect();
@@ -78,7 +80,8 @@ class VkAutoCollectionServiceTest {
                 new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
-                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build())),
+                millis -> {}
         );
 
         service.collect();
