@@ -5,6 +5,7 @@ import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkRegionalCity;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCollectionMethod;
@@ -377,6 +378,11 @@ class IntegrationApiTest {
                 }
 
                 @Override
+                public List<VkRegionalCity> resolveRegionalCities(String region) {
+                    return List.of(new VkRegionalCity(1, region));
+                }
+
+                @Override
                 public List<VkGroupSearchResult> searchGroups(String region, int limit) {
                     return List.of(new VkGroupSearchResult(
                             1001L,
@@ -413,6 +419,11 @@ class IntegrationApiTest {
                             "{\"friends\":120}",
                             "{\"id\":2002}"
                     ));
+                }
+
+                @Override
+                public List<VkUserSearchResult> searchUsers(VkRegionalCity city, int limit) {
+                    return searchUsers(city.title(), limit);
                 }
 
                 @Override

@@ -9,6 +9,7 @@ import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkRegionalCity;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCollectionMethod;
@@ -98,23 +99,17 @@ public class VkDiscoveryOrchestrator {
     public void runUserSearch(VkCrawlJob job, SearchVkUsersRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
         try {
-            List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
-            List<UserSearchHit> results = searchUsers(searchTerms, request.limit(), false);
+            List<VkRegionalCity> regionalCities = vkOfficialClient.resolveRegionalCities(request.region());
+            Map<Long, VkUserCandidate> matchedCandidatesById = collectUserCandidates(regionalCities, request.limit(), false);
             VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
-            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-                List<UserSearchHit> fallbackResults = searchUsers(searchTerms, request.limit(), true);
-                if (!fallbackResults.isEmpty()) {
-                    results = fallbackResults;
+            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), matchedCandidatesById.isEmpty(), false)) {
+                Map<Long, VkUserCandidate> fallbackCandidates = collectFallbackUserCandidates(regionalCities, request.limit());
+                if (!fallbackCandidates.isEmpty()) {
+                    matchedCandidatesById = fallbackCandidates;
                     method = VkCollectionMethod.FALLBACK;
                 }
             }
 
-            VkCollectionMethod finalMethod = method;
-            Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
-            results.stream()
-                    .map(hit -> vkOfficialUserCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
-                    .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
-                    .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate));
             List<VkUserCandidate> matchedCandidates = matchedCandidatesById.values().stream()
                     .limit(request.limit())
                     .map(vkCandidatePersistenceService::upsertUserCandidate)
@@ -359,6 +354,38 @@ public class VkDiscoveryOrchestrator {
             }
         }
         return List.copyOf(results);
+    }
+
+    private Map<Long, VkUserCandidate> collectUserCandidates(List<VkRegionalCity> regionalCities, int limit, boolean useFallback) {
+        Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
+        List<VkRegionalCity> effectiveCities = regionalCities.isEmpty() ? List.of() : regionalCities;
+        for (int index = 0; index < effectiveCities.size() && matchedCandidatesById.size() < limit; index++) {
+            if (!useFallback && index > 0) {
+                throttleUserSearch();
+            }
+            VkRegionalCity regionalCity = effectiveCities.get(index);
+            List<VkUserSearchResult> results = useFallback
+                    ? vkFallbackClient.searchUsers(regionalCity.title(), limit)
+                    : vkOfficialClient.searchUsers(regionalCity, limit);
+            for (VkUserSearchResult result : results) {
+                VkUserCandidate candidate = vkOfficialUserCandidateMapper.map(
+                        regionalCity.title(),
+                        result,
+                        useFallback ? VkCollectionMethod.FALLBACK : VkCollectionMethod.OFFICIAL_API
+                );
+                if (candidate.getRegionMatchSource() != VkMatchSource.FALLBACK) {
+                    matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate);
+                    if (matchedCandidatesById.size() >= limit) {
+                        break;
+                    }
+                }
+            }
+        }
+        return matchedCandidatesById;
+    }
+
+    private Map<Long, VkUserCandidate> collectFallbackUserCandidates(List<VkRegionalCity> regionalCities, int limit) {
+        return collectUserCandidates(regionalCities, limit, true);
     }
 
     private void throttleUserSearch() {

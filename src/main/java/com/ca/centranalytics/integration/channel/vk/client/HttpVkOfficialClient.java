@@ -2,6 +2,7 @@ package com.ca.centranalytics.integration.channel.vk.client;
 
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkRegionalCity;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
@@ -66,19 +67,27 @@ public class HttpVkOfficialClient implements VkOfficialClient {
 
     @Override
     public List<String> resolveRegionalSearchTerms(String region) {
+        return resolveRegionalCities(region).stream()
+                .map(VkRegionalCity::title)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    @Override
+    public List<VkRegionalCity> resolveRegionalCities(String region) {
         if (!StringUtils.hasText(region)) {
             return List.of();
         }
         if (!isEaoRegion(region)) {
-            return List.of(region);
+            return List.of(new VkRegionalCity(null, region));
         }
 
         Integer regionId = resolveRegionId(region);
         if (regionId == null) {
-            return List.of(region);
+            return List.of(new VkRegionalCity(null, region));
         }
 
-        Set<String> searchTerms = new LinkedHashSet<>();
+        Set<VkRegionalCity> regionalCities = new LinkedHashSet<>();
         int offset = 0;
         while (true) {
             int currentOffset = offset;
@@ -90,23 +99,24 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                     .count(VK_DATABASE_PAGE_SIZE)
                     .execute());
 
-            List<City> cities = response.getItems();
-            if (cities == null || cities.isEmpty()) {
+            List<City> pageCities = response.getItems();
+            if (pageCities == null || pageCities.isEmpty()) {
                 break;
             }
 
-            cities.stream()
-                    .map(City::getTitle)
-                    .filter(StringUtils::hasText)
-                    .forEach(searchTerms::add);
+            pageCities.stream()
+                    .filter(city -> city.getId() != null)
+                    .map(city -> new VkRegionalCity(city.getId(), city.getTitle()))
+                    .filter(city -> StringUtils.hasText(city.title()))
+                    .forEach(regionalCities::add);
 
-            offset += cities.size();
-            if (cities.size() < VK_DATABASE_PAGE_SIZE) {
+            offset += pageCities.size();
+            if (pageCities.size() < VK_DATABASE_PAGE_SIZE) {
                 break;
             }
         }
 
-        return searchTerms.isEmpty() ? List.of(region) : List.copyOf(searchTerms);
+        return regionalCities.isEmpty() ? List.of(new VkRegionalCity(null, region)) : List.copyOf(regionalCities);
     }
 
     @Override
@@ -124,12 +134,20 @@ public class HttpVkOfficialClient implements VkOfficialClient {
 
     @Override
     public List<VkUserSearchResult> searchUsers(String region, int limit) {
-        com.vk.api.sdk.objects.users.responses.SearchResponse response = execute(() -> vkApiClient.users()
+        return searchUsers(new VkRegionalCity(null, region), limit);
+    }
+
+    @Override
+    public List<VkUserSearchResult> searchUsers(VkRegionalCity city, int limit) {
+        com.vk.api.sdk.queries.users.UsersSearchQuery query = vkApiClient.users()
                 .search(userActorForUserCalls())
-                .q(region)
+                .q(city.title())
                 .count(limit)
-                .fields(userFields())
-                .execute());
+                .fields(userFields());
+        if (city.id() != null) {
+            query.cityId(city.id());
+        }
+        com.vk.api.sdk.objects.users.responses.SearchResponse response = execute(query::execute);
 
         return response.getItems().stream()
                 .map(this::toUserResult)

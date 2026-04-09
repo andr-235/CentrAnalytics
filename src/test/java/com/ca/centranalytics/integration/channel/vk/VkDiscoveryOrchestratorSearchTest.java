@@ -6,6 +6,7 @@ import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
+import com.ca.centranalytics.integration.channel.vk.client.dto.VkRegionalCity;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkWallPostResult;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCollectionMethod;
@@ -206,6 +207,17 @@ class VkDiscoveryOrchestratorSearchTest {
                 }
 
                 @Override
+                public List<VkRegionalCity> resolveRegionalCities(String region) {
+                    if ("Еврейская автономная область".equals(region)) {
+                        return List.of(
+                                new VkRegionalCity(1, "Биробиджан"),
+                                new VkRegionalCity(2, "Облучье")
+                        );
+                    }
+                    return List.of(new VkRegionalCity(null, region));
+                }
+
+                @Override
                 public List<VkGroupSearchResult> searchGroups(String region, int limit) {
                     return switch (region) {
                         case "Биробиджан" -> List.of(
@@ -236,6 +248,11 @@ class VkDiscoveryOrchestratorSearchTest {
                         );
                         default -> List.of();
                     };
+                }
+
+                @Override
+                public List<VkUserSearchResult> searchUsers(VkRegionalCity city, int limit) {
+                    return searchUsers(city.title(), limit);
                 }
 
                 @Override
