@@ -37,6 +37,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class VkDiscoveryOrchestrator {
+    private static final long USER_SEARCH_THROTTLE_MS = 1_000L;
 
     private final VkOfficialClient vkOfficialClient;
     private final VkFallbackClient vkFallbackClient;
@@ -137,7 +138,7 @@ public class VkDiscoveryOrchestrator {
 
         List<VkWallPostResult> results;
         try {
-            results = vkOfficialClient.getGroupPosts(groupId, request.limit());
+            results = vkOfficialClient.getGroupPosts(resolveGroupDomain(groupId), request.limit());
         } catch (RuntimeException ex) {
             finalizeJob(job.getId(), 0, 0, 1, 0);
             return;
@@ -255,6 +256,14 @@ public class VkDiscoveryOrchestrator {
                 ));
     }
 
+    private String resolveGroupDomain(Long groupId) {
+        return vkGroupCandidateRepository.findByVkGroupId(groupId)
+                .map(VkGroupCandidate::getScreenName)
+                .filter(Objects::nonNull)
+                .filter(screenName -> !screenName.isBlank())
+                .orElse("club" + groupId);
+    }
+
     private Map<Long, VkUserCandidate> enrichUsers(List<Long> userIds, String collectionMode) {
         if (userIds.isEmpty()) {
             return Map.of();
@@ -337,7 +346,11 @@ public class VkDiscoveryOrchestrator {
     private List<UserSearchHit> searchUsers(List<String> searchTerms, int limit, boolean useFallback) {
         List<UserSearchHit> results = new ArrayList<>();
         List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
-        for (String searchTerm : effectiveTerms) {
+        for (int index = 0; index < effectiveTerms.size(); index++) {
+            if (!useFallback && index > 0) {
+                throttleUserSearch();
+            }
+            String searchTerm = effectiveTerms.get(index);
             List<VkUserSearchResult> termResults = useFallback
                     ? vkFallbackClient.searchUsers(searchTerm, limit)
                     : vkOfficialClient.searchUsers(searchTerm, limit);
@@ -346,6 +359,15 @@ public class VkDiscoveryOrchestrator {
             }
         }
         return List.copyOf(results);
+    }
+
+    private void throttleUserSearch() {
+        try {
+            Thread.sleep(USER_SEARCH_THROTTLE_MS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("VK user search interrupted", ex);
+        }
     }
 
     private record GroupSearchHit(String searchTerm, VkGroupSearchResult result) {

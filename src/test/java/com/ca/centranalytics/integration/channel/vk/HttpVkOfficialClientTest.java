@@ -93,7 +93,7 @@ class HttpVkOfficialClientTest {
                 new VkApiClient(transportClient)
         );
 
-        var posts = client.getGroupPosts(1001L, 5);
+        var posts = client.getGroupPosts("club1001", 5);
         var comments = client.getPostComments(-1001L, 3003L, 5);
         var users = client.getUsersByIds(List.of(2002L, 3003L));
 
@@ -113,7 +113,7 @@ class HttpVkOfficialClientTest {
                 .containsExactly("id2002", "id3003");
         assertThat(users).extracting(user -> user.education())
                 .containsExactly("FEFU", null);
-        assertThat(transportClient.lastRequestByMethod.get("wall.get")).contains("owner_id=-1001");
+        assertThat(transportClient.lastRequestByMethod.get("wall.get")).contains("domain=club1001");
         assertThat(transportClient.lastRequestByMethod.get("users.get")).contains("user_ids=2002%2C3003");
         assertThat(transportClient.lastRequestByMethod.get("users.get")).contains("access_token=vk-token");
     }

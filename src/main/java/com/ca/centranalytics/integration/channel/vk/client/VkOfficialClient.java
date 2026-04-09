@@ -11,7 +11,7 @@ public interface VkOfficialClient {
     List<String> resolveRegionalSearchTerms(String region);
     List<VkGroupSearchResult> searchGroups(String region, int limit);
     List<VkUserSearchResult> searchUsers(String region, int limit);
-    List<VkWallPostResult> getGroupPosts(Long groupId, int limit);
+    List<VkWallPostResult> getGroupPosts(String domain, int limit);
     List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit);
     List<VkUserSearchResult> getUsersByIds(List<Long> userIds);
 }

@@ -239,7 +239,7 @@ class VkDiscoveryOrchestratorSearchTest {
                 }
 
                 @Override
-                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+                public List<VkWallPostResult> getGroupPosts(String domain, int limit) {
                     if (failGroupPosts) {
                         throw new IllegalStateException("VK SDK call failed");
                     }

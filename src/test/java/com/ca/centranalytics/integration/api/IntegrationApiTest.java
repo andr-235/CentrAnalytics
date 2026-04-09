@@ -416,7 +416,8 @@ class IntegrationApiTest {
                 }
 
                 @Override
-                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+                public List<VkWallPostResult> getGroupPosts(String domain, int limit) {
+                    long groupId = 1001L;
                     return List.of(new VkWallPostResult(
                             -groupId,
                             3003L,

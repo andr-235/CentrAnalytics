@@ -137,10 +137,10 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     }
 
     @Override
-    public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
+    public List<VkWallPostResult> getGroupPosts(String domain, int limit) {
         com.vk.api.sdk.objects.wall.responses.GetResponse response = execute(() -> vkApiClient.wall()
                 .get(userActorForOfficialCalls())
-                .unsafeParam("owner_id", -Math.abs(groupId))
+                .domain(domain)
                 .count(limit)
                 .execute());
 
