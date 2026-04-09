@@ -119,6 +119,37 @@ class VkDiscoveryOrchestratorSearchTest {
     }
 
     @Test
+    void rotatesRegionalCityBatchesDuringUserSearch() {
+        SearchHarness harness = new SearchHarness();
+        harness.regionalCities = List.of(
+                new VkRegionalCity(1, "Биробиджан"),
+                new VkRegionalCity(2, "Облучье"),
+                new VkRegionalCity(3, "Смидович"),
+                new VkRegionalCity(4, "Ленинское"),
+                new VkRegionalCity(5, "Амурзет")
+        );
+
+        harness.orchestrator.runUserSearch(
+                harness.job(1L, VkCrawlJobType.USER_SEARCH),
+                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.searchedUserCities)
+                .containsExactly("Биробиджан", "Облучье", "Смидович");
+
+        harness.searchedUserCities.clear();
+        harness.userCandidates.clear();
+
+        harness.orchestrator.runUserSearch(
+                harness.job(2L, VkCrawlJobType.USER_SEARCH),
+                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.searchedUserCities)
+                .containsExactly("Ленинское", "Амурзет");
+    }
+
+    @Test
     void marksGroupPostJobFailedWhenOfficialApiThrows() {
         SearchHarness harness = new SearchHarness();
         harness.failGroupPosts = true;
@@ -152,6 +183,11 @@ class VkDiscoveryOrchestratorSearchTest {
     private static final class SearchHarness {
         private final Map<Long, VkGroupCandidate> groupCandidates = new LinkedHashMap<>();
         private final Map<Long, VkUserCandidate> userCandidates = new LinkedHashMap<>();
+        private List<VkRegionalCity> regionalCities = List.of(
+                new VkRegionalCity(1, "Биробиджан"),
+                new VkRegionalCity(2, "Облучье")
+        );
+        private final List<String> searchedUserCities = new java.util.ArrayList<>();
         private boolean failGroupPosts;
         private boolean failUserSearch;
         private VkCrawlJob job;
@@ -187,8 +223,12 @@ class VkDiscoveryOrchestratorSearchTest {
         }
 
         private VkCrawlJob job(VkCrawlJobType jobType) {
+            return job(1L, jobType);
+        }
+
+        private VkCrawlJob job(Long jobId, VkCrawlJobType jobType) {
             this.job = VkCrawlJob.builder()
-                    .id(1L)
+                    .id(jobId)
                     .jobType(jobType)
                     .status(VkCrawlJobStatus.CREATED)
                     .requestJson("{}")
@@ -209,10 +249,7 @@ class VkDiscoveryOrchestratorSearchTest {
                 @Override
                 public List<VkRegionalCity> resolveRegionalCities(String region) {
                     if ("Еврейская автономная область".equals(region)) {
-                        return List.of(
-                                new VkRegionalCity(1, "Биробиджан"),
-                                new VkRegionalCity(2, "Облучье")
-                        );
+                        return regionalCities;
                     }
                     return List.of(new VkRegionalCity(null, region));
                 }
@@ -237,6 +274,7 @@ class VkDiscoveryOrchestratorSearchTest {
                     if (failUserSearch) {
                         throw new IllegalStateException("VK SDK call failed");
                     }
+                    searchedUserCities.add(region);
                     return switch (region) {
                         case "Биробиджан" -> List.of(
                                 new VkUserSearchResult(7001L, "Irina B.", "Irina", "B.", "id7001", "https://vk.com/id7001", "Биробиджан", "Биробиджан", null, 1, null, null, null, null, null, null, null, null, null, null, "{\"id\":7001}"),
@@ -245,6 +283,15 @@ class VkDiscoveryOrchestratorSearchTest {
                         );
                         case "Облучье" -> List.of(
                                 new VkUserSearchResult(7002L, "Pavel O.", "Pavel", "O.", "id7002", "https://vk.com/id7002", "Облучье", "Облучье", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7002}")
+                        );
+                        case "Смидович" -> List.of(
+                                new VkUserSearchResult(7003L, "S. User", "S.", "User", "id7003", "https://vk.com/id7003", "Смидович", "Смидович", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7003}")
+                        );
+                        case "Ленинское" -> List.of(
+                                new VkUserSearchResult(7004L, "L. User", "L.", "User", "id7004", "https://vk.com/id7004", "Ленинское", "Ленинское", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7004}")
+                        );
+                        case "Амурзет" -> List.of(
+                                new VkUserSearchResult(7005L, "A. User", "A.", "User", "id7005", "https://vk.com/id7005", "Амурзет", "Амурзет", null, 2, null, null, null, null, null, null, null, null, null, null, "{\"id\":7005}")
                         );
                         default -> List.of();
                     };
