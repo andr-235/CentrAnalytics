@@ -39,7 +39,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class VkDiscoveryOrchestrator {
     private static final long USER_SEARCH_THROTTLE_MS = 1_000L;
-    private static final int USER_SEARCH_CITY_BATCH_SIZE = 3;
+    private static final int REGIONAL_SEARCH_BATCH_SIZE = 3;
 
     private final VkOfficialClient vkOfficialClient;
     private final VkFallbackClient vkFallbackClient;
@@ -62,7 +62,7 @@ public class VkDiscoveryOrchestrator {
     public void runGroupSearch(VkCrawlJob job, SearchVkGroupsRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
         try {
-            List<String> searchTerms = vkOfficialClient.resolveRegionalSearchTerms(request.region());
+            List<String> searchTerms = selectRegionalSearchBatch(job, vkOfficialClient.resolveRegionalSearchTerms(request.region()));
             List<GroupSearchHit> results = searchGroups(searchTerms, request.limit(), false);
             VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
             if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
@@ -390,17 +390,25 @@ public class VkDiscoveryOrchestrator {
         return collectUserCandidates(regionalCities, limit, true);
     }
 
+    private List<String> selectRegionalSearchBatch(VkCrawlJob job, List<String> searchTerms) {
+        return selectBatch(job, searchTerms);
+    }
+
     private List<VkRegionalCity> selectUserSearchCityBatch(VkCrawlJob job, List<VkRegionalCity> regionalCities) {
-        if (regionalCities.size() <= USER_SEARCH_CITY_BATCH_SIZE) {
-            return regionalCities;
+        return selectBatch(job, regionalCities);
+    }
+
+    private <T> List<T> selectBatch(VkCrawlJob job, List<T> items) {
+        if (items.size() <= REGIONAL_SEARCH_BATCH_SIZE) {
+            return items;
         }
 
-        int batchCount = (regionalCities.size() + USER_SEARCH_CITY_BATCH_SIZE - 1) / USER_SEARCH_CITY_BATCH_SIZE;
+        int batchCount = (items.size() + REGIONAL_SEARCH_BATCH_SIZE - 1) / REGIONAL_SEARCH_BATCH_SIZE;
         long batchSeed = job.getId() == null ? 0L : job.getId() - 1L;
         int batchIndex = (int) Math.floorMod(batchSeed, batchCount);
-        int fromIndex = batchIndex * USER_SEARCH_CITY_BATCH_SIZE;
-        int toIndex = Math.min(fromIndex + USER_SEARCH_CITY_BATCH_SIZE, regionalCities.size());
-        return regionalCities.subList(fromIndex, toIndex);
+        int fromIndex = batchIndex * REGIONAL_SEARCH_BATCH_SIZE;
+        int toIndex = Math.min(fromIndex + REGIONAL_SEARCH_BATCH_SIZE, items.size());
+        return items.subList(fromIndex, toIndex);
     }
 
     private void throttleUserSearch() {

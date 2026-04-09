@@ -85,6 +85,31 @@ class VkDiscoveryOrchestratorSearchTest {
     }
 
     @Test
+    void rotatesRegionalCityBatchesDuringGroupSearch() {
+        SearchHarness harness = new SearchHarness();
+        harness.regionalSearchTerms = List.of("Биробиджан", "Облучье", "Смидович", "Ленинское", "Амурзет");
+
+        harness.orchestrator.runGroupSearch(
+                harness.job(1L, VkCrawlJobType.GROUP_SEARCH),
+                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.searchedGroupTerms)
+                .containsExactly("Биробиджан", "Облучье", "Смидович");
+
+        harness.searchedGroupTerms.clear();
+        harness.groupCandidates.clear();
+
+        harness.orchestrator.runGroupSearch(
+                harness.job(2L, VkCrawlJobType.GROUP_SEARCH),
+                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+        );
+
+        assertThat(harness.searchedGroupTerms)
+                .containsExactly("Ленинское", "Амурзет");
+    }
+
+    @Test
     void expandsEaoIntoCityQueriesForUserSearchWithoutDuplicates() {
         SearchHarness harness = new SearchHarness();
 
@@ -183,10 +208,12 @@ class VkDiscoveryOrchestratorSearchTest {
     private static final class SearchHarness {
         private final Map<Long, VkGroupCandidate> groupCandidates = new LinkedHashMap<>();
         private final Map<Long, VkUserCandidate> userCandidates = new LinkedHashMap<>();
+        private List<String> regionalSearchTerms = List.of("Биробиджан", "Облучье");
         private List<VkRegionalCity> regionalCities = List.of(
                 new VkRegionalCity(1, "Биробиджан"),
                 new VkRegionalCity(2, "Облучье")
         );
+        private final List<String> searchedGroupTerms = new java.util.ArrayList<>();
         private final List<String> searchedUserCities = new java.util.ArrayList<>();
         private boolean failGroupPosts;
         private boolean failUserSearch;
@@ -241,7 +268,7 @@ class VkDiscoveryOrchestratorSearchTest {
                 @Override
                 public List<String> resolveRegionalSearchTerms(String region) {
                     if ("Еврейская автономная область".equals(region)) {
-                        return List.of("Биробиджан", "Облучье");
+                        return regionalSearchTerms;
                     }
                     return List.of(region);
                 }
@@ -256,6 +283,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
                 @Override
                 public List<VkGroupSearchResult> searchGroups(String region, int limit) {
+                    searchedGroupTerms.add(region);
                     return switch (region) {
                         case "Биробиджан" -> List.of(
                                 new VkGroupSearchResult(5001L, "Биробиджан Новости", "birobidzhan_news", "Городские новости", "Биробиджан", "{\"id\":5001}"),
@@ -264,6 +292,15 @@ class VkDiscoveryOrchestratorSearchTest {
                         );
                         case "Облучье" -> List.of(
                                 new VkGroupSearchResult(5002L, "ЕАО Объявления", "eao_ads", "Региональные объявления", "Облучье", "{\"id\":5002}")
+                        );
+                        case "Смидович" -> List.of(
+                                new VkGroupSearchResult(5003L, "Смидович ЕАО", "smidovich_eao", "Смидовичский район", "Смидович", "{\"id\":5003}")
+                        );
+                        case "Ленинское" -> List.of(
+                                new VkGroupSearchResult(5004L, "Ленинское ЕАО", "leninskoe_eao", "Ленинский район", "Ленинское", "{\"id\":5004}")
+                        );
+                        case "Амурзет" -> List.of(
+                                new VkGroupSearchResult(5005L, "Амурзет ЕАО", "amurzet_eao", "Октябрьский район", "Амурзет", "{\"id\":5005}")
                         );
                         default -> List.of();
                     };
