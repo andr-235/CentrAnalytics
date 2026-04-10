@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import {
+  collectVkGroups,
+  deleteVkGroups,
   fetchIntegrationsSnapshot,
   startTelegramSession,
   submitTelegramCode,
@@ -10,6 +12,7 @@ import type {
   IntegrationsResult,
   TelegramActionResult,
   TelegramSessionRecord,
+  VkGroupActionResult,
   VkGroupRecord
 } from "./integrations.types";
 
@@ -27,6 +30,14 @@ type IntegrationsPageProps = {
     sessionId: string,
     password: string
   ) => Promise<TelegramActionResult>;
+  collectVkGroups?: (
+    token: string,
+    groupIdentifiers: string[]
+  ) => Promise<VkGroupActionResult>;
+  deleteVkGroups?: (
+    token: string,
+    groupIdentifiers: string[]
+  ) => Promise<VkGroupActionResult>;
   onUnauthorized?: () => void;
 };
 
@@ -88,6 +99,8 @@ export function IntegrationsPage({
   startSession = startTelegramSession,
   submitCode = submitTelegramCode,
   submitPassword = submitTelegramPassword,
+  collectVkGroups: runVkCollect = collectVkGroups,
+  deleteVkGroups: runVkDelete = deleteVkGroups,
   onUnauthorized
 }: IntegrationsPageProps) {
   const [telegramSession, setTelegramSession] = useState<TelegramSessionRecord | null>(null);
@@ -98,6 +111,9 @@ export function IntegrationsPage({
   const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedVkGroupIds, setSelectedVkGroupIds] = useState<string[]>([]);
+  const [vkActionMessage, setVkActionMessage] = useState("");
+  const [isVkSubmitting, setIsVkSubmitting] = useState(false);
 
   async function refresh() {
     setIsLoading(true);
@@ -120,6 +136,11 @@ export function IntegrationsPage({
 
     setTelegramSession(result.data.telegramSession);
     setVkGroups(result.data.vkGroups);
+    setSelectedVkGroupIds((current) =>
+      current.filter((identifier) =>
+        result.data.vkGroups.some((group) => String(group.id) === identifier)
+      )
+    );
     setIsLoading(false);
   }
 
@@ -148,7 +169,44 @@ export function IntegrationsPage({
     setPassword("");
   }
 
-  const recentGroups = vkGroups.slice(0, 6);
+  function toggleVkGroupSelection(identifier: string) {
+    setSelectedVkGroupIds((current) =>
+      current.includes(identifier)
+        ? current.filter((value) => value !== identifier)
+        : [...current, identifier]
+    );
+  }
+
+  async function runVkAction(
+    action: (token: string, groupIdentifiers: string[]) => Promise<VkGroupActionResult>,
+    groupIdentifiers: string[]
+  ) {
+    if (!groupIdentifiers.length) {
+      return;
+    }
+
+    setIsVkSubmitting(true);
+    setError("");
+    setVkActionMessage("");
+    const result = await action(token, groupIdentifiers);
+    setIsVkSubmitting(false);
+
+    if (!result.ok) {
+      if (result.unauthorized) {
+        onUnauthorized?.();
+        return;
+      }
+
+      setError(result.error);
+      return;
+    }
+
+    const unresolvedSuffix = result.unresolvedIdentifiers.length
+      ? ` Не найдены: ${result.unresolvedIdentifiers.join(", ")}.`
+      : "";
+    setVkActionMessage(`${result.message}${unresolvedSuffix}`);
+    await refresh();
+  }
 
   return (
     <main className="integrations-shell">
@@ -328,14 +386,57 @@ export function IntegrationsPage({
             состояние витрины без декоративного шума.
           </p>
 
-          <div className="vk-group-list">
+          <div className="vk-group-toolbar">
+            <div className="vk-group-toolbar__meta">
+              <strong>{selectedVkGroupIds.length} выбрано</strong>
+              <span>Ручной запуск и удаление работают только по группам из текущей БД.</span>
+            </div>
+            <div className="vk-group-toolbar__actions">
+              <button
+                type="button"
+                className="integration-action"
+                disabled={isVkSubmitting || !selectedVkGroupIds.length}
+                onClick={() => void runVkAction(runVkCollect, selectedVkGroupIds)}
+              >
+                Собрать выбранные
+              </button>
+              <button
+                type="button"
+                className="integration-action integration-action--secondary"
+                disabled={isVkSubmitting || !selectedVkGroupIds.length}
+                onClick={() => void runVkAction(runVkDelete, selectedVkGroupIds)}
+              >
+                Удалить выбранные
+              </button>
+            </div>
+          </div>
+
+          {vkActionMessage ? (
+            <p className="integration-note integration-note--success">{vkActionMessage}</p>
+          ) : null}
+
+          <div className="vk-group-list" data-testid="vk-group-scroll">
             <div className="vk-group-list__head">
+              <span />
               <span>Группа</span>
               <span>Метод</span>
               <span>Обновлено</span>
             </div>
-            {recentGroups.map((group) => (
+            {vkGroups.map((group) => {
+              const identifier = String(group.id);
+
+              return (
               <div key={group.id} className="vk-group-row">
+                <div className="vk-group-row__selection">
+                  <label className="vk-group-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedVkGroupIds.includes(identifier)}
+                      onChange={() => toggleVkGroupSelection(identifier)}
+                      aria-label={`Выбрать группу ${groupTitle(group)}`}
+                    />
+                  </label>
+                </div>
                 <div>
                   <strong>{groupTitle(group)}</strong>
                   <span>
@@ -346,14 +447,33 @@ export function IntegrationsPage({
                   <strong>{group.collectionMethod}</strong>
                   <span>{group.regionMatchSource}</span>
                 </div>
-                <div>
+                <div className="vk-group-row__meta">
                   <strong>{formatDateTime(group.updatedAt)}</strong>
                   <span>{group.sourceId ? `Source ${group.sourceId}` : "Источник создается"}</span>
+                  <div className="vk-group-row__actions">
+                    <button
+                      type="button"
+                      className="integration-action integration-action--ghost"
+                      disabled={isVkSubmitting}
+                      onClick={() => void runVkAction(runVkCollect, [identifier])}
+                    >
+                      Собрать
+                    </button>
+                    <button
+                      type="button"
+                      className="integration-action integration-action--ghost"
+                      disabled={isVkSubmitting}
+                      onClick={() => void runVkAction(runVkDelete, [identifier])}
+                    >
+                      Удалить
+                    </button>
+                  </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
-            {!recentGroups.length ? (
+            {!vkGroups.length ? (
               <div className="vk-group-list__empty">
                 Региональные группы пока не найдены. После первого цикла
                 автосбора список появится здесь.

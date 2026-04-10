@@ -977,13 +977,57 @@ input {
   color: var(--danger);
 }
 
+.integration-note--success {
+  color: #2b6d55;
+}
+
+.integration-action--ghost {
+  padding: 10px 14px;
+  background: rgba(227, 235, 243, 0.82);
+  box-shadow: none;
+  color: var(--text-primary);
+}
+
+.vk-group-toolbar {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.vk-group-toolbar__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.vk-group-toolbar__meta strong {
+  font-size: 0.92rem;
+}
+
+.vk-group-toolbar__meta span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.vk-group-toolbar__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .vk-group-list {
   position: relative;
   z-index: 1;
   margin-top: 18px;
   border: 1px solid rgba(88, 109, 130, 0.1);
   border-radius: 6px;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 460px;
   background: rgba(248, 250, 252, 0.54);
 }
 
@@ -991,10 +1035,12 @@ input {
 .vk-group-row {
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.75fr) minmax(0, 0.95fr);
+  grid-template-columns: 34px minmax(0, 1.4fr) minmax(0, 0.75fr) minmax(0, 1fr);
 }
 
 .vk-group-list__head {
+  position: sticky;
+  top: 0;
   padding: 12px 14px;
   background: rgba(227, 235, 243, 0.78);
   color: var(--text-muted);
@@ -1025,6 +1071,35 @@ input {
   line-height: 1.45;
 }
 
+.vk-group-row__selection {
+  display: flex;
+  justify-content: center;
+  align-items: start;
+  padding-top: 4px;
+}
+
+.vk-group-checkbox {
+  display: flex;
+  justify-content: center;
+}
+
+.vk-group-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #44627f;
+}
+
+.vk-group-row__meta {
+  align-content: start;
+}
+
+.vk-group-row__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
 .vk-group-list__empty {
   padding: 18px 14px;
   color: var(--text-muted);
@@ -1052,7 +1127,8 @@ input {
     flex-direction: column;
   }
 
-  .integrations-hero {
+  .integrations-hero,
+  .vk-group-toolbar {
     align-items: start;
     flex-direction: column;
   }
@@ -1111,7 +1187,17 @@ input {
     grid-template-columns: 1fr;
   }
 
+  .vk-group-row__selection {
+    justify-content: start;
+    padding-top: 0;
+  }
+
   .integration-action {
+    width: 100%;
+  }
+
+  .vk-group-toolbar__actions,
+  .vk-group-row__actions {
     width: 100%;
   }
 }

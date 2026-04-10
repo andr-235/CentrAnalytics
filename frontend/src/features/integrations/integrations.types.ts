@@ -39,3 +39,15 @@ export type IntegrationsResult =
 export type TelegramActionResult =
   | { ok: true; session: TelegramSessionRecord }
   | { ok: false; error: string; unauthorized?: boolean };
+
+export type VkGroupActionResult =
+  | {
+      ok: true;
+      message: string;
+      unresolvedIdentifiers: string[];
+    }
+  | {
+      ok: false;
+      error: string;
+      unauthorized?: boolean;
+    };

@@ -2,6 +2,7 @@ import type {
   IntegrationsResult,
   TelegramActionResult,
   TelegramSessionRecord,
+  VkGroupActionResult,
   VkGroupRecord
 } from "./integrations.types";
 
@@ -140,5 +141,87 @@ export function submitTelegramPassword(token: string, sessionId: string, passwor
     token,
     `/api/admin/integrations/telegram-user/${sessionId}/password`,
     { password }
+  );
+}
+
+async function submitVkGroupAction(
+  token: string,
+  path: string,
+  method: "POST" | "DELETE",
+  groupIdentifiers: string[]
+): Promise<VkGroupActionResult> {
+  try {
+    const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method,
+      headers: authHeaders(token, true),
+      body: JSON.stringify({ groupIdentifiers })
+    });
+
+    const data = await readJson(response);
+
+    if (!response.ok || !data || typeof data !== "object") {
+      if (response.status === 401) {
+        return {
+          ok: false,
+          unauthorized: true,
+          error:
+            data && typeof data.error === "string"
+              ? data.error
+              : "Сессия истекла. Выполните вход заново."
+        };
+      }
+
+      return {
+        ok: false,
+        error:
+          data && typeof data.error === "string"
+            ? data.error
+            : "Не удалось выполнить действие VK"
+      };
+    }
+
+    const unresolvedIdentifiers = Array.isArray(data.unresolvedIdentifiers)
+      ? data.unresolvedIdentifiers.filter((value: unknown): value is string => typeof value === "string")
+      : [];
+    const resolvedCount = Array.isArray(data.resolvedGroups)
+      ? data.resolvedGroups.length
+      : Array.isArray(data.deletedGroups)
+        ? data.deletedGroups.length
+        : 0;
+    const message =
+      method === "POST"
+        ? `Сбор запущен для ${resolvedCount} групп`
+        : resolvedCount === 1
+          ? "Удалена 1 группа"
+          : `Удалено ${resolvedCount} группы`;
+
+    return {
+      ok: true,
+      message,
+      unresolvedIdentifiers
+    };
+  } catch {
+    return {
+      ok: false,
+      error: "Сервер недоступен. Проверь backend и повтори запрос."
+    };
+  }
+}
+
+export function collectVkGroups(token: string, groupIdentifiers: string[]) {
+  return submitVkGroupAction(
+    token,
+    "/api/admin/integrations/vk/groups/collect",
+    "POST",
+    groupIdentifiers
+  );
+}
+
+export function deleteVkGroups(token: string, groupIdentifiers: string[]) {
+  return submitVkGroupAction(
+    token,
+    "/api/admin/integrations/vk/groups",
+    "DELETE",
+    groupIdentifiers
   );
 }
