@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { TelegramSessionPage } from "../features/integrations/TelegramSessionPage";
+import { VkGroupsPage } from "../features/integrations/VkGroupsPage";
 import { AppShell } from "../features/shell/AppShell";
 import type {
   NavigationSelection,
@@ -115,6 +117,14 @@ export default function App() {
 
     if (activeSecondary === "messages") {
       return <DashboardPage token={token} onUnauthorized={clearSession} />;
+    }
+
+    if (activePrimary === "telegram" && activeSecondary === "session") {
+      return <TelegramSessionPage token={token} onUnauthorized={clearSession} />;
+    }
+
+    if (activePrimary === "vk" && (activeSecondary === "groups" || activeSecondary === "collection")) {
+      return <VkGroupsPage token={token} onUnauthorized={clearSession} />;
     }
 
     return (

@@ -2,6 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { IntegrationsPage } from "./IntegrationsPage";
+import { TelegramSessionPage } from "./TelegramSessionPage";
+import { VkGroupsPage } from "./VkGroupsPage";
 import type {
   IntegrationsResult,
   TelegramActionResult,
@@ -262,5 +264,33 @@ describe("IntegrationsPage", () => {
 
     await user.click(within(row as HTMLElement).getByRole("button", { name: /удалить/i }));
     expect(deleteGroups).toHaveBeenCalledWith("token", ["3"]);
+  });
+
+  it("renders the telegram session page independently", async () => {
+    render(
+      <TelegramSessionPage
+        token="token"
+        loadSnapshot={vi.fn().mockResolvedValue(snapshot)}
+      />
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /telegram/i, level: 1 })
+    ).toBeInTheDocument();
+    expect(screen.getByText("+79991234567")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /интеграции/i })).not.toBeInTheDocument();
+  });
+
+  it("renders the vk groups page independently", async () => {
+    render(
+      <VkGroupsPage
+        token="token"
+        loadSnapshot={vi.fn().mockResolvedValue(extendedSnapshot)}
+      />
+    );
+
+    expect(await screen.findByText("Приморский край 24")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /собрать выбранные/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /интеграции/i })).not.toBeInTheDocument();
   });
 });
