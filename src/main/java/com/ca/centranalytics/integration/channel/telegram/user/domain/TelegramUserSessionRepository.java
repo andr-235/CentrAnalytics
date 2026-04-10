@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface TelegramUserSessionRepository extends JpaRepository<TelegramUserSession, Long> {
     List<TelegramUserSession> findByAuthorizedTrue();
     Optional<TelegramUserSession> findFirstByAuthorizedTrue();
+    Optional<TelegramUserSession> findFirstByOrderByUpdatedAtDesc();
 }

@@ -4,6 +4,7 @@ import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { TelegramSessionPage } from "../features/integrations/TelegramSessionPage";
 import { VkGroupsPage } from "../features/integrations/VkGroupsPage";
+import { OverviewPage } from "../features/overview/OverviewPage";
 import { AppShell } from "../features/shell/AppShell";
 import type {
   NavigationSelection,
@@ -93,16 +94,7 @@ export default function App() {
 
   function renderContent() {
     if (activePrimary === "overview") {
-      return (
-        <section className="placeholder-page">
-          <p className="placeholder-page__eyebrow">Операционный обзор</p>
-          <h1>Выберите раздел платформы</h1>
-          <p>
-            Навигация теперь организована по каналам. Раскройте нужную платформу
-            слева и выберите рабочий подраздел.
-          </p>
-        </section>
-      );
+      return <OverviewPage token={token} onUnauthorized={clearSession} />;
     }
 
     if (activePrimary === "settings") {

@@ -9,5 +9,6 @@ import java.util.Optional;
 
 public interface IntegrationSourceRepository extends JpaRepository<IntegrationSource, Long> {
     List<IntegrationSource> findByPlatform(Platform platform);
+    long countByPlatform(Platform platform);
     Optional<IntegrationSource> findByPlatformAndSourceExternalId(Platform platform, String sourceExternalId);
 }

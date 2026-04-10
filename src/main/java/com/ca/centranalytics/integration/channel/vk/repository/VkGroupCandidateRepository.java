@@ -10,5 +10,6 @@ public interface VkGroupCandidateRepository extends JpaRepository<VkGroupCandida
     Optional<VkGroupCandidate> findByVkGroupId(Long vkGroupId);
     Optional<VkGroupCandidate> findByScreenNameIgnoreCase(String screenName);
     List<VkGroupCandidate> findAllByOrderByUpdatedAtDesc();
+    long count();
     long countBySourceId(Long sourceId);
 }
