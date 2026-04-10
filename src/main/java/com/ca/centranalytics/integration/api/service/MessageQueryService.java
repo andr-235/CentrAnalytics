@@ -37,7 +37,7 @@ public class MessageQueryService {
         int resolvedLimit = normalizeLimit(limit);
         int resolvedOffset = normalizeOffset(offset);
 
-        return messageRepository.findMessageResponses(
+        return messageRepository.findMessages(
                 platform,
                 conversationId,
                 authorId,
@@ -46,7 +46,25 @@ public class MessageQueryService {
                 normalizedSearch,
                 resolvedOffset,
                 resolvedLimit
-        );
+        ).stream()
+                .map(message -> new MessageResponse(
+                        message.getId(),
+                        message.getPlatform(),
+                        message.getExternalMessageId(),
+                        message.getConversation().getId(),
+                        message.getConversation().getTitle(),
+                        message.getConversation().getExternalConversationId(),
+                        message.getConversation().getType().name(),
+                        message.getAuthor() == null ? null : message.getAuthor().getId(),
+                        message.getAuthor() == null ? null : message.getAuthor().getDisplayName(),
+                        message.getAuthor() == null ? null : message.getAuthor().getUsername(),
+                        message.getAuthor() == null ? null : message.getAuthor().getExternalUserId(),
+                        message.getAuthor() == null ? null : message.getAuthor().getPhone(),
+                        message.getText(),
+                        message.getMessageType(),
+                        message.getSentAt()
+                ))
+                .toList();
     }
 
     public MessageDetailsResponse getMessage(Long id) {

@@ -1,6 +1,5 @@
 package com.ca.centranalytics.integration.api.dto;
 
-import com.ca.centranalytics.integration.domain.entity.ConversationType;
 import com.ca.centranalytics.integration.domain.entity.MessageType;
 import com.ca.centranalytics.integration.domain.entity.Platform;
 
@@ -13,7 +12,7 @@ public record MessageResponse(
         Long conversationId,
         String conversationTitle,
         String externalConversationId,
-        ConversationType conversationType,
+        String conversationType,
         Long authorId,
         String authorDisplayName,
         String authorUsername,

@@ -1,13 +1,13 @@
 package com.ca.centranalytics.integration.domain.repository;
 
-import com.ca.centranalytics.integration.api.dto.MessageResponse;
+import com.ca.centranalytics.integration.domain.entity.Message;
 import com.ca.centranalytics.integration.domain.entity.Platform;
 
 import java.time.Instant;
 import java.util.List;
 
 public interface MessageRepositoryCustom {
-    List<MessageResponse> findMessageResponses(
+    List<Message> findMessages(
             Platform platform,
             Long conversationId,
             Long authorId,
