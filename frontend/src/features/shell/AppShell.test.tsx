@@ -66,4 +66,28 @@ describe("AppShell", () => {
       secondary: "session"
     });
   });
+
+  it("renders only the expanded platform subsection list", () => {
+    render(
+      <AppShell activePrimary="vk" activeSecondary="groups" expandedPlatform="vk">
+        <div>Content</div>
+      </AppShell>
+    );
+
+    expect(screen.getByRole("button", { name: /^группы$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^сессия$/i })).not.toBeInTheDocument();
+  });
+
+  it("marks the selected subsection as the current page", () => {
+    render(
+      <AppShell activePrimary="telegram" activeSecondary="session" expandedPlatform="telegram">
+        <div>Content</div>
+      </AppShell>
+    );
+
+    expect(screen.getByRole("button", { name: /^сессия$/i })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
 });
