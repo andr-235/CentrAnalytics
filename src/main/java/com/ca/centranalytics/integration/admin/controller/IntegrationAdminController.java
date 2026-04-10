@@ -11,13 +11,19 @@ import com.ca.centranalytics.integration.channel.vk.api.VkCommentSnapshotRespons
 import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobStatusResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkGroupCandidateResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkGroupCollectRequest;
+import com.ca.centranalytics.integration.channel.vk.api.VkGroupCollectResponse;
+import com.ca.centranalytics.integration.channel.vk.api.VkGroupDeleteRequest;
+import com.ca.centranalytics.integration.channel.vk.api.VkGroupDeleteResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkUserCandidateResponse;
 import com.ca.centranalytics.integration.channel.vk.api.VkWallPostSnapshotResponse;
 import com.ca.centranalytics.integration.channel.vk.service.VkCrawlCommandService;
 import com.ca.centranalytics.integration.channel.vk.service.VkDiscoveryQueryService;
+import com.ca.centranalytics.integration.channel.vk.service.VkGroupManagementService;
 import com.ca.centranalytics.integration.channel.vk.service.VkJobQueryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +41,7 @@ public class IntegrationAdminController {
     private final VkCrawlCommandService vkCrawlCommandService;
     private final VkJobQueryService vkJobQueryService;
     private final VkDiscoveryQueryService vkDiscoveryQueryService;
+    private final VkGroupManagementService vkGroupManagementService;
 
     @GetMapping("/api/raw-events/{id}")
     public RawEventResponse getRawEvent(@PathVariable Long id) {
@@ -57,6 +64,22 @@ public class IntegrationAdminController {
             @Valid @RequestBody CollectVkGroupPostsRequest request
     ) {
         return vkCrawlCommandService.createGroupPostsJob(groupId, request);
+    }
+
+    @PostMapping("/api/admin/integrations/vk/groups/collect")
+    public VkGroupCollectResponse collectVkGroups(@Valid @RequestBody VkGroupCollectRequest request) {
+        return vkGroupManagementService.collectGroups(
+                request.groupIdentifiers(),
+                request.resolvedPostLimit(),
+                request.resolvedCommentPostLimit(),
+                request.resolvedCommentLimit(),
+                request.resolvedCollectionMode()
+        );
+    }
+
+    @DeleteMapping("/api/admin/integrations/vk/groups")
+    public VkGroupDeleteResponse deleteVkGroups(@Valid @RequestBody VkGroupDeleteRequest request) {
+        return vkGroupManagementService.deleteGroups(request.groupIdentifiers());
     }
 
     @PostMapping("/api/admin/integrations/vk/posts/comments/collect")

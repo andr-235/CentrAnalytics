@@ -8,5 +8,6 @@ import java.util.Optional;
 
 public interface VkGroupCandidateRepository extends JpaRepository<VkGroupCandidate, Long> {
     Optional<VkGroupCandidate> findByVkGroupId(Long vkGroupId);
+    Optional<VkGroupCandidate> findByScreenNameIgnoreCase(String screenName);
     List<VkGroupCandidate> findAllByOrderByUpdatedAtDesc();
 }

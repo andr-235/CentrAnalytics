@@ -54,6 +54,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -331,6 +332,47 @@ class IntegrationApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].commentId").value(4004))
                 .andExpect(jsonPath("$[0].text").value("Great post"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void collectsPostsAndCommentsOnlyForResolvedExistingGroups() throws Exception {
+        mockMvc.perform(post("/api/admin/integrations/vk/groups/collect")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"groupIdentifiers":["1001","primorye_group","missing_group"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resolvedGroups[0].vkGroupId").value(1001))
+                .andExpect(jsonPath("$.unresolvedIdentifiers[0]").value("missing_group"))
+                .andExpect(jsonPath("$.postJobs[0].jobType").value("GROUP_POSTS"))
+                .andExpect(jsonPath("$.commentJobs[0].jobType").value("POST_COMMENTS"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void deletesResolvedGroupsAndAllGroupLinkedSnapshotsAndSources() throws Exception {
+        mockMvc.perform(delete("/api/admin/integrations/vk/groups")
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"groupIdentifiers":["1001","primorye_group","missing_group"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedGroups[0].vkGroupId").value(1001))
+                .andExpect(jsonPath("$.unresolvedIdentifiers[0]").value("missing_group"));
+
+        mockMvc.perform(get("/api/admin/integrations/vk/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mockMvc.perform(get("/api/admin/integrations/vk/groups/{groupId}/posts", 1001L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mockMvc.perform(get("/api/admin/integrations/vk/posts/{postId}/comments", 3003L)
+                        .param("ownerId", "-1001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test

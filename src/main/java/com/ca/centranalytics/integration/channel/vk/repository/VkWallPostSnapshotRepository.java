@@ -10,4 +10,5 @@ public interface VkWallPostSnapshotRepository extends JpaRepository<VkWallPostSn
     Optional<VkWallPostSnapshot> findByOwnerIdAndPostId(Long ownerId, Long postId);
     List<VkWallPostSnapshot> findAllByPostIdIn(List<Long> postIds);
     List<VkWallPostSnapshot> findAllByOwnerIdOrderByUpdatedAtDesc(Long ownerId);
+    void deleteAllByOwnerId(Long ownerId);
 }

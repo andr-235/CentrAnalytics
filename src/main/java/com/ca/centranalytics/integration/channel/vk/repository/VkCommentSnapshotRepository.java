@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface VkCommentSnapshotRepository extends JpaRepository<VkCommentSnapshot, Long> {
     Optional<VkCommentSnapshot> findByOwnerIdAndPostIdAndCommentId(Long ownerId, Long postId, Long commentId);
     List<VkCommentSnapshot> findAllByOwnerIdAndPostIdOrderByUpdatedAtDesc(Long ownerId, Long postId);
+    void deleteAllByOwnerId(Long ownerId);
 }
