@@ -58,32 +58,44 @@ describe("DashboardPage", () => {
       items: messages
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByText(/проверка аналитического пайплайна/i)).toBeInTheDocument();
     expect(screen.getByText(/нужен повторный обзвон/i)).toBeInTheDocument();
     expect(loadMessages).toHaveBeenCalledWith("token", {
       limit: 25,
       offset: 0,
-      platform: "ALL",
+      platform: "TELEGRAM",
       search: ""
     });
   });
 
-  it("submits search filters to the loader", async () => {
+  it("submits search text to the loader without rendering a platform filter", async () => {
     const user = userEvent.setup();
     const loadMessages = vi.fn().mockResolvedValue({
       ok: true as const,
       items: messages
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     await screen.findByText(/проверка аналитического пайплайна/i);
     await user.type(screen.getByPlaceholderText(/поиск по тексту/i), "воронка");
-    await user.selectOptions(screen.getByLabelText(/платформа/i), "TELEGRAM");
     await user.click(screen.getByRole("button", { name: /обновить/i }));
 
+    expect(screen.queryByLabelText(/платформа/i)).not.toBeInTheDocument();
     expect(loadMessages).toHaveBeenLastCalledWith("token", {
       limit: 25,
       offset: 0,
@@ -107,7 +119,13 @@ describe("DashboardPage", () => {
         items: secondPage
       });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByText("Сообщение страницы 0")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /вперёд/i }));
@@ -115,7 +133,7 @@ describe("DashboardPage", () => {
     expect(loadMessages).toHaveBeenLastCalledWith("token", {
       limit: 25,
       offset: 25,
-      platform: "ALL",
+      platform: "TELEGRAM",
       search: ""
     });
     expect(await screen.findByText("Сообщение страницы 25")).toBeInTheDocument();
@@ -129,7 +147,13 @@ describe("DashboardPage", () => {
       items: messages
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByText("Алексей Смирнов")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /вперёд/i })).toBeDisabled();
@@ -149,7 +173,13 @@ describe("DashboardPage", () => {
         items: buildPage(50)
       });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     await screen.findByText("Сообщение страницы 0");
     await user.selectOptions(screen.getByLabelText(/размер страницы/i), "50");
@@ -158,7 +188,7 @@ describe("DashboardPage", () => {
       expect(loadMessages).toHaveBeenLastCalledWith("token", {
         limit: 50,
         offset: 0,
-        platform: "ALL",
+        platform: "TELEGRAM",
         search: ""
       })
     );
@@ -171,24 +201,35 @@ describe("DashboardPage", () => {
       error: "Invalid or expired token"
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/invalid or expired token/i);
   });
 
-  it("renders a structured table header", async () => {
+  it("renders a platform-specific table header without the platform column", async () => {
     const loadMessages = vi.fn().mockResolvedValue({
       ok: true as const,
       items: messages
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     const table = await screen.findByRole("table", { name: /журнал сообщений/i });
     const headers = within(table).getAllByRole("columnheader").map((node) => node.textContent);
 
     expect(headers).toEqual([
-      "Платформа",
       "Автор",
       "Сообщение",
       "Диалог",
@@ -203,7 +244,13 @@ describe("DashboardPage", () => {
       items: messages
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="TELEGRAM"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByText("Алексей Смирнов")).toBeInTheDocument();
     expect(screen.getByText("@alex-smirnov · id 675752815")).toBeInTheDocument();
@@ -218,7 +265,13 @@ describe("DashboardPage", () => {
       items: [messages[1]]
     });
 
-    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+    render(
+      <DashboardPage
+        token="token"
+        initialPlatform="WHATSAPP"
+        loadMessages={loadMessages}
+      />
+    );
 
     expect(await screen.findByText("Екатерина Волкова")).toBeInTheDocument();
     expect(screen.getByText("GROUP")).toBeInTheDocument();

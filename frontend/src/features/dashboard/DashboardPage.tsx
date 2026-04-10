@@ -5,11 +5,11 @@ import type { MessageRecord } from "./dashboard.types";
 
 type DashboardPageProps = {
   token: string;
+  initialPlatform?: "TELEGRAM" | "WHATSAPP" | "VK" | "MAX";
   loadMessages?: typeof fetchMessages;
   onUnauthorized?: () => void;
 };
 
-const platformOptions = ["ALL", "TELEGRAM", "WHATSAPP", "VK"];
 const PAGE_SIZE = 25;
 const pageSizeOptions = [25, 50, 100];
 
@@ -22,19 +22,6 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
-}
-
-function platformLabel(value: string) {
-  switch (value) {
-    case "TELEGRAM":
-      return "Telegram";
-    case "WHATSAPP":
-      return "WhatsApp";
-    case "VK":
-      return "VK";
-    default:
-      return value;
-  }
 }
 
 function authorPrimary(item: MessageRecord) {
@@ -102,12 +89,12 @@ function conversationSecondary(item: MessageRecord) {
 
 export function DashboardPage({
   token,
+  initialPlatform = "TELEGRAM",
   loadMessages = fetchMessages,
   onUnauthorized
 }: DashboardPageProps) {
   const [items, setItems] = useState<MessageRecord[]>([]);
   const [search, setSearch] = useState("");
-  const [platform, setPlatform] = useState("ALL");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(true);
@@ -116,7 +103,6 @@ export function DashboardPage({
 
   async function refresh(
     nextSearch = search,
-    nextPlatform = platform,
     nextPage = page,
     nextPageSize = pageSize
   ) {
@@ -127,7 +113,7 @@ export function DashboardPage({
       limit: nextPageSize,
       offset: nextPage * nextPageSize,
       search: nextSearch,
-      platform: nextPlatform
+      platform: initialPlatform
     });
 
     if (!result.ok) {
@@ -150,8 +136,8 @@ export function DashboardPage({
   }
 
   useEffect(() => {
-    void refresh("", "ALL", 0, PAGE_SIZE);
-  }, []);
+    void refresh("", 0, PAGE_SIZE);
+  }, [initialPlatform]);
 
   return (
     <main className="dashboard-shell">
@@ -176,28 +162,13 @@ export function DashboardPage({
           </label>
 
           <label className="dashboard-select">
-            <span>Платформа</span>
-            <select
-              aria-label="Платформа"
-              value={platform}
-              onChange={(event) => setPlatform(event.target.value)}
-            >
-              {platformOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === "ALL" ? "Все" : platformLabel(option)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="dashboard-select">
             <span>Размер страницы</span>
             <select
               aria-label="Размер страницы"
               value={String(pageSize)}
               onChange={(event) => {
                 const nextPageSize = Number(event.target.value);
-                void refresh(search, platform, 0, nextPageSize);
+                void refresh(search, 0, nextPageSize);
               }}
             >
               {pageSizeOptions.map((option) => (
@@ -211,7 +182,7 @@ export function DashboardPage({
           <button
             type="button"
             className="dashboard-refresh"
-            onClick={() => void refresh(search, platform, 0, pageSize)}
+            onClick={() => void refresh(search, 0, pageSize)}
           >
             {isLoading ? "Загрузка..." : "Обновить"}
           </button>
@@ -228,7 +199,6 @@ export function DashboardPage({
         <table aria-label="Журнал сообщений">
           <thead>
             <tr>
-              <th>Платформа</th>
               <th>Автор</th>
               <th>Сообщение</th>
               <th>Диалог</th>
@@ -239,11 +209,6 @@ export function DashboardPage({
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td>
-                  <span className={`platform-chip platform-chip--${item.platform.toLowerCase()}`}>
-                    {platformLabel(item.platform)}
-                  </span>
-                </td>
                 <td>
                   <div className="table-meta">
                     <strong>{authorPrimary(item)}</strong>
@@ -277,7 +242,7 @@ export function DashboardPage({
               type="button"
               className="dashboard-page-button"
               disabled={isLoading || page === 0}
-              onClick={() => void refresh(search, platform, page - 1, pageSize)}
+              onClick={() => void refresh(search, page - 1, pageSize)}
             >
               Назад
             </button>
@@ -285,7 +250,7 @@ export function DashboardPage({
               type="button"
               className="dashboard-page-button"
               disabled={isLoading || !hasNextPage}
-              onClick={() => void refresh(search, platform, page + 1, pageSize)}
+              onClick={() => void refresh(search, page + 1, pageSize)}
             >
               Вперёд
             </button>

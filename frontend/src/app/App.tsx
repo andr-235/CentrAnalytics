@@ -116,7 +116,37 @@ export default function App() {
     }
 
     if (activeSecondary === "messages") {
-      return <DashboardPage token={token} onUnauthorized={clearSession} />;
+      if (activePrimary === "telegram") {
+        return (
+          <DashboardPage
+            token={token}
+            initialPlatform="TELEGRAM"
+            onUnauthorized={clearSession}
+          />
+        );
+      }
+
+      if (activePrimary === "vk") {
+        return (
+          <DashboardPage token={token} initialPlatform="VK" onUnauthorized={clearSession} />
+        );
+      }
+
+      if (activePrimary === "whatsapp") {
+        return (
+          <DashboardPage
+            token={token}
+            initialPlatform="WHATSAPP"
+            onUnauthorized={clearSession}
+          />
+        );
+      }
+
+      if (activePrimary === "max") {
+        return (
+          <DashboardPage token={token} initialPlatform="MAX" onUnauthorized={clearSession} />
+        );
+      }
     }
 
     if (activePrimary === "telegram" && activeSecondary === "session") {
