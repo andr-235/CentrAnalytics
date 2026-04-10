@@ -2,40 +2,68 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { AppShell } from "./AppShell";
+import type { NavigationSelection } from "./navigation.types";
 
 describe("AppShell", () => {
-  it("renders the full navigation map", () => {
-    render(<AppShell activeItem="messages"><div>Content</div></AppShell>);
-
-    expect(screen.getByRole("navigation", { name: /основная навигация/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /сообщения/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /диалоги/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /пользователи/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /интеграции/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /настройки/i })).toBeInTheDocument();
-  });
-
-  it("marks the active section", () => {
-    render(<AppShell activeItem="messages"><div>Content</div></AppShell>);
-
-    expect(screen.getByRole("button", { name: /сообщения/i })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
-  });
-
-  it("calls onNavigate for inactive sections", async () => {
-    const user = userEvent.setup();
-    const onNavigate = vi.fn();
-
+  it("renders the platform-first navigation map", () => {
     render(
-      <AppShell activeItem="messages" onNavigate={onNavigate}>
+      <AppShell activePrimary="telegram" activeSecondary="messages" expandedPlatform="telegram">
         <div>Content</div>
       </AppShell>
     );
 
-    await user.click(screen.getByRole("button", { name: /диалоги/i }));
+    expect(screen.getByRole("navigation", { name: /основная навигация/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /обзор/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /вконтакте/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /телеграм/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /max/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /whatsapp/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /настройки/i })).toBeInTheDocument();
+  });
 
-    expect(onNavigate).toHaveBeenCalledWith("conversations");
+  it("toggles a platform without selecting a nested item", async () => {
+    const user = userEvent.setup();
+    const onTogglePlatform = vi.fn();
+    const onSelectItem = vi.fn();
+
+    render(
+      <AppShell
+        activePrimary="overview"
+        activeSecondary={null}
+        expandedPlatform="vk"
+        onTogglePlatform={onTogglePlatform}
+        onSelectItem={onSelectItem}
+      >
+        <div>Content</div>
+      </AppShell>
+    );
+
+    await user.click(screen.getByRole("button", { name: /телеграм/i }));
+
+    expect(onTogglePlatform).toHaveBeenCalledWith("telegram");
+    expect(onSelectItem).not.toHaveBeenCalled();
+  });
+
+  it("selects a nested platform section", async () => {
+    const user = userEvent.setup();
+    const onSelectItem = vi.fn<[NavigationSelection], void>();
+
+    render(
+      <AppShell
+        activePrimary="telegram"
+        activeSecondary="session"
+        expandedPlatform="telegram"
+        onSelectItem={onSelectItem}
+      >
+        <div>Content</div>
+      </AppShell>
+    );
+
+    await user.click(screen.getByRole("button", { name: /^сессия$/i }));
+
+    expect(onSelectItem).toHaveBeenCalledWith({
+      primary: "telegram",
+      secondary: "session"
+    });
   });
 });
