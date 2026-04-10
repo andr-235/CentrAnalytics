@@ -408,10 +408,18 @@ jobs:
 
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-          set -a
-          . ./.env
-          . ./.images.env
-          set +a
+          read_env_value() {
+            local key="$1"
+            local value
+            value="$(sed -n "s/^${key}=//p" .env | tail -n 1)"
+            value="${value%\"}"
+            value="${value#\"}"
+            value="${value%\'}"
+            value="${value#\'}"
+            printf '%s' "$value"
+          }
+
+          compose_cmd=(docker compose --env-file .env --env-file .images.env -f compose.prod.yaml)
 
           services_to_pull=""
           services_to_up=""
@@ -435,7 +443,7 @@ jobs:
             pull_attempt=1
             pull_max_attempts=3
 
-            until docker compose -f compose.prod.yaml pull $services_to_pull; do
+            until "${compose_cmd[@]}" pull $services_to_pull; do
               if [ "$pull_attempt" -ge "$pull_max_attempts" ]; then
                 echo "Failed to pull updated images after $pull_max_attempts attempts" >&2
                 exit 1
@@ -448,13 +456,18 @@ jobs:
           fi
 
           if [ -n "$services_to_up" ]; then
-            docker compose -f compose.prod.yaml up -d --remove-orphans $services_to_up
+            "${compose_cmd[@]}" up -d --remove-orphans $services_to_up
           else
-            docker compose -f compose.prod.yaml up -d --remove-orphans
+            "${compose_cmd[@]}" up -d --remove-orphans
           fi
 
-          frontend_healthcheck_url="${FRONTEND_HEALTHCHECK_URL:-http://127.0.0.1:${FRONTEND_PORT:-18080}/}"
-          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://127.0.0.1:${FRONTEND_PORT:-18080}/actuator/health}"
+          frontend_port="$(read_env_value FRONTEND_PORT)"
+          if [ -z "$frontend_port" ]; then
+            frontend_port="18080"
+          fi
+
+          frontend_healthcheck_url="${FRONTEND_HEALTHCHECK_URL:-http://127.0.0.1:${frontend_port}/}"
+          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://127.0.0.1:${frontend_port}/actuator/health}"
 
           for _ in $(seq 1 24); do
             if curl -fsS "$frontend_healthcheck_url" >/dev/null && curl -fsS "$backend_healthcheck_url" >/dev/null; then
@@ -467,5 +480,5 @@ jobs:
           echo "Health check failed" >&2
           echo "Frontend URL: $frontend_healthcheck_url" >&2
           echo "Backend URL: $backend_healthcheck_url" >&2
-          docker compose -f compose.prod.yaml ps >&2
+          "${compose_cmd[@]}" ps >&2
           exit 1
