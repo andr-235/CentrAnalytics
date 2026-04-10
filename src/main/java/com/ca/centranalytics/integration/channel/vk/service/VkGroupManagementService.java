@@ -75,11 +75,7 @@ public class VkGroupManagementService {
             Long ownerId = -Math.abs(group.getVkGroupId());
             vkCommentSnapshotRepository.deleteAllByOwnerId(ownerId);
             vkWallPostSnapshotRepository.deleteAllByOwnerId(ownerId);
-            if (group.getSource() != null) {
-                integrationSourceRepository.delete(group.getSource());
-            } else {
-                vkGroupCandidateRepository.delete(group);
-            }
+            vkGroupCandidateRepository.delete(group);
         }
 
         return new VkGroupDeleteResponse(deletedGroups, selection.unresolvedIdentifiers());

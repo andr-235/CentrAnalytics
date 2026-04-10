@@ -63,7 +63,6 @@ class VkGroupManagementServiceTest {
         assertThat(fixture.groupsById).isEmpty();
         assertThat(fixture.postsByOwner).isEmpty();
         assertThat(fixture.deletedCommentOwners).containsExactly(-1001L);
-        assertThat(fixture.deletedSourceIds).containsExactly(501L);
     }
 
     private static final class Fixture {
@@ -132,6 +131,14 @@ class VkGroupManagementServiceTest {
                         groupsById.remove(candidate.getId());
                         yield null;
                     }
+                    case "countBySourceId" -> {
+                        Long sourceId = (Long) args[0];
+                        long count = groupsById.values().stream()
+                                .filter(candidate -> candidate.getSource() != null)
+                                .filter(candidate -> candidate.getSource().getId().equals(sourceId))
+                                .count();
+                        yield count;
+                    }
                     default -> throw new UnsupportedOperationException(method.getName());
                 }
         );
@@ -174,8 +181,6 @@ class VkGroupManagementServiceTest {
                     case "delete" -> {
                         IntegrationSource source = (IntegrationSource) args[0];
                         deletedSourceIds.add(source.getId());
-                        groupsById.entrySet().removeIf(entry -> entry.getValue().getSource() != null
-                                && entry.getValue().getSource().getId().equals(source.getId()));
                         yield null;
                     }
                     default -> throw new UnsupportedOperationException(method.getName());
