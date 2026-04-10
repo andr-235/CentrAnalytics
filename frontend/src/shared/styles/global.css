@@ -703,6 +703,37 @@ input {
   color: var(--text-muted);
 }
 
+.dashboard-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 24px 24px;
+}
+
+.dashboard-pagination__status {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-page-button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid rgba(63, 83, 104, 0.16);
+  border-radius: 4px;
+  background: rgba(246, 249, 252, 0.88);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.dashboard-page-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .placeholder-page {
   display: grid;
   align-content: center;

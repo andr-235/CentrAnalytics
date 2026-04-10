@@ -11,46 +11,42 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MessageQueryService {
 
+    private static final int DEFAULT_LIMIT = 100;
+    private static final int MAX_LIMIT = 500;
+
     private final MessageRepository messageRepository;
     private final MessageAttachmentRepository messageAttachmentRepository;
 
-    public List<MessageResponse> getMessages(Platform platform, Long conversationId, Long authorId, Instant from, Instant to, String search) {
+    public List<MessageResponse> getMessages(
+            Platform platform,
+            Long conversationId,
+            Long authorId,
+            Instant from,
+            Instant to,
+            String search,
+            Integer limit,
+            Integer offset
+    ) {
         String normalizedSearch = search == null ? null : search.toLowerCase();
-        return messageRepository.findAll().stream()
-                .filter(message -> platform == null || message.getPlatform() == platform)
-                .filter(message -> conversationId == null || message.getConversation().getId().equals(conversationId))
-                .filter(message -> authorId == null || (message.getAuthor() != null && message.getAuthor().getId().equals(authorId)))
-                .filter(message -> from == null || !message.getSentAt().isBefore(from))
-                .filter(message -> to == null || !message.getSentAt().isAfter(to))
-                .filter(message -> normalizedSearch == null
-                        || contains(message.getText(), normalizedSearch)
-                        || contains(message.getNormalizedText(), normalizedSearch))
-                .sorted(Comparator.comparing(Message::getSentAt).reversed())
-                .map(message -> new MessageResponse(
-                        message.getId(),
-                        message.getPlatform(),
-                        message.getExternalMessageId(),
-                        message.getConversation().getId(),
-                        message.getConversation().getTitle(),
-                        message.getConversation().getExternalConversationId(),
-                        message.getConversation().getType().name(),
-                        message.getAuthor() == null ? null : message.getAuthor().getId(),
-                        message.getAuthor() == null ? null : message.getAuthor().getDisplayName(),
-                        message.getAuthor() == null ? null : message.getAuthor().getUsername(),
-                        message.getAuthor() == null ? null : message.getAuthor().getExternalUserId(),
-                        message.getAuthor() == null ? null : message.getAuthor().getPhone(),
-                        message.getText(),
-                        message.getMessageType(),
-                        message.getSentAt()
-                ))
-                .toList();
+        int resolvedLimit = normalizeLimit(limit);
+        int resolvedOffset = normalizeOffset(offset);
+
+        return messageRepository.findMessageResponses(
+                platform,
+                conversationId,
+                authorId,
+                from,
+                to,
+                normalizedSearch,
+                resolvedOffset,
+                resolvedLimit
+        );
     }
 
     public MessageDetailsResponse getMessage(Long id) {
@@ -83,7 +79,19 @@ public class MessageQueryService {
         );
     }
 
-    private boolean contains(String value, String search) {
-        return value != null && value.toLowerCase().contains(search);
+    private int normalizeLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_LIMIT;
+        }
+
+        return Math.min(Math.max(limit, 1), MAX_LIMIT);
+    }
+
+    private int normalizeOffset(Integer offset) {
+        if (offset == null) {
+            return 0;
+        }
+
+        return Math.max(offset, 0);
     }
 }

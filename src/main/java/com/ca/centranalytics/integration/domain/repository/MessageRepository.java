@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-public interface MessageRepository extends JpaRepository<Message, Long> {
+public interface MessageRepository extends JpaRepository<Message, Long>, MessageRepositoryCustom {
     Optional<Message> findByConversationIdAndExternalMessageId(Long conversationId, String externalMessageId);
     List<Message> findByPlatform(Platform platform);
     List<Message> findByConversationId(Long conversationId);

@@ -9,7 +9,7 @@ function resolveApiBaseUrl() {
 
 export async function fetchMessages(
   token: string,
-  options: { search?: string; platform?: string } = {}
+  options: { search?: string; platform?: string; limit?: number; offset?: number } = {}
 ) {
   const searchParams = new URLSearchParams();
 
@@ -19,6 +19,14 @@ export async function fetchMessages(
 
   if (options.platform?.trim() && options.platform !== "ALL") {
     searchParams.set("platform", options.platform.trim());
+  }
+
+  if (typeof options.limit === "number") {
+    searchParams.set("limit", String(options.limit));
+  }
+
+  if (typeof options.offset === "number" && options.offset > 0) {
+    searchParams.set("offset", String(options.offset));
   }
 
   const query = searchParams.toString();

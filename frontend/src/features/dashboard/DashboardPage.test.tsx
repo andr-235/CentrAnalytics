@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { DashboardPage } from "./DashboardPage";
@@ -41,6 +41,16 @@ const messages: MessageRecord[] = [
   }
 ];
 
+function buildPage(size: number, startIndex = 0) {
+  return Array.from({ length: size }, (_, index) => ({
+    ...messages[0],
+    id: messages[0].id + startIndex + index,
+    externalMessageId: `msg-page-${startIndex + index}`,
+    text: `Сообщение страницы ${startIndex + index}`,
+    sentAt: `2026-04-07T02:${String((startIndex + index) % 60).padStart(2, "0")}:00Z`
+  }));
+}
+
 describe("DashboardPage", () => {
   it("renders message rows from the backend", async () => {
     const loadMessages = vi.fn().mockResolvedValue({
@@ -52,6 +62,12 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText(/проверка аналитического пайплайна/i)).toBeInTheDocument();
     expect(screen.getByText(/нужен повторный обзвон/i)).toBeInTheDocument();
+    expect(loadMessages).toHaveBeenCalledWith("token", {
+      limit: 25,
+      offset: 0,
+      platform: "ALL",
+      search: ""
+    });
   });
 
   it("submits search filters to the loader", async () => {
@@ -69,9 +85,84 @@ describe("DashboardPage", () => {
     await user.click(screen.getByRole("button", { name: /обновить/i }));
 
     expect(loadMessages).toHaveBeenLastCalledWith("token", {
+      limit: 25,
+      offset: 0,
       search: "воронка",
       platform: "TELEGRAM"
     });
+  });
+
+  it("moves to the next page", async () => {
+    const user = userEvent.setup();
+    const firstPage = buildPage(25);
+    const secondPage = buildPage(25, 25);
+    const loadMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true as const,
+        items: firstPage
+      })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        items: secondPage
+      });
+
+    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+
+    expect(await screen.findByText("Сообщение страницы 0")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /вперёд/i }));
+
+    expect(loadMessages).toHaveBeenLastCalledWith("token", {
+      limit: 25,
+      offset: 25,
+      platform: "ALL",
+      search: ""
+    });
+    expect(await screen.findByText("Сообщение страницы 25")).toBeInTheDocument();
+    expect(screen.queryByText("Сообщение страницы 0")).not.toBeInTheDocument();
+    expect(screen.getByText("Страница 2")).toBeInTheDocument();
+  });
+
+  it("disables forward navigation when the backend returned less than a page", async () => {
+    const loadMessages = vi.fn().mockResolvedValue({
+      ok: true as const,
+      items: messages
+    });
+
+    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+
+    expect(await screen.findByText("Алексей Смирнов")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /вперёд/i })).toBeDisabled();
+    expect(screen.getByText("Страница 1")).toBeInTheDocument();
+  });
+
+  it("changes page size and resets paging to the first page", async () => {
+    const user = userEvent.setup();
+    const loadMessages = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true as const,
+        items: buildPage(25)
+      })
+      .mockResolvedValueOnce({
+        ok: true as const,
+        items: buildPage(50)
+      });
+
+    render(<DashboardPage token="token" loadMessages={loadMessages} />);
+
+    await screen.findByText("Сообщение страницы 0");
+    await user.selectOptions(screen.getByLabelText(/размер страницы/i), "50");
+
+    await waitFor(() =>
+      expect(loadMessages).toHaveBeenLastCalledWith("token", {
+        limit: 50,
+        offset: 0,
+        platform: "ALL",
+        search: ""
+      })
+    );
+    expect(screen.getByText("Страница 1")).toBeInTheDocument();
   });
 
   it("shows a compact error banner when loading fails", async () => {

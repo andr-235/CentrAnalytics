@@ -260,6 +260,68 @@ class IntegrationApiTest {
     }
 
     @Test
+    @WithMockUser(username = "reader", roles = "USER")
+    void limitsMessageListAndReturnsNewestItemsFirst() throws Exception {
+        Conversation conversation = conversationRepository.findAll().getFirst();
+        ExternalUser author = externalUserRepository.findAll().getFirst();
+        RawEvent rawEvent = rawEventRepository.findAll().getFirst();
+
+        for (int index = 0; index < 105; index++) {
+            messageRepository.save(Message.builder()
+                    .conversation(conversation)
+                    .platform(Platform.VK)
+                    .externalMessageId("bulk-" + index)
+                    .author(author)
+                    .sentAt(Instant.parse("2026-04-03T00:00:00Z").plusSeconds(index))
+                    .text("Bulk message " + index)
+                    .normalizedText("bulk message " + index)
+                    .messageType(MessageType.TEXT)
+                    .hasAttachments(false)
+                    .rawEvent(rawEvent)
+                    .ingestionStatus(ProcessingStatus.PERSISTED)
+                    .build());
+        }
+
+        mockMvc.perform(get("/api/messages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(100))
+                .andExpect(jsonPath("$[0].externalMessageId").value("bulk-104"))
+                .andExpect(jsonPath("$[99].externalMessageId").value("bulk-5"));
+    }
+
+    @Test
+    @WithMockUser(username = "reader", roles = "USER")
+    void supportsPagingThroughMessagesWithOffsetAndLimit() throws Exception {
+        Conversation conversation = conversationRepository.findAll().getFirst();
+        ExternalUser author = externalUserRepository.findAll().getFirst();
+        RawEvent rawEvent = rawEventRepository.findAll().getFirst();
+
+        for (int index = 0; index < 5; index++) {
+            messageRepository.save(Message.builder()
+                    .conversation(conversation)
+                    .platform(Platform.VK)
+                    .externalMessageId("page-" + index)
+                    .author(author)
+                    .sentAt(Instant.parse("2026-04-04T00:00:00Z").plusSeconds(index))
+                    .text("Page message " + index)
+                    .normalizedText("page message " + index)
+                    .messageType(MessageType.TEXT)
+                    .hasAttachments(false)
+                    .rawEvent(rawEvent)
+                    .ingestionStatus(ProcessingStatus.PERSISTED)
+                    .build());
+        }
+
+        mockMvc.perform(get("/api/messages")
+                        .param("limit", "2")
+                        .param("offset", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].externalMessageId").value("page-3"))
+                .andExpect(jsonPath("$[1].externalMessageId").value("page-2"));
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void allowsAdminEndpointsForAdmins() throws Exception {
         mockMvc.perform(get("/api/raw-events/{id}", rawEventId))

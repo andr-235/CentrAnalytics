@@ -10,6 +10,8 @@ type DashboardPageProps = {
 };
 
 const platformOptions = ["ALL", "TELEGRAM", "WHATSAPP", "VK"];
+const PAGE_SIZE = 25;
+const pageSizeOptions = [25, 50, 100];
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -106,14 +108,24 @@ export function DashboardPage({
   const [items, setItems] = useState<MessageRecord[]>([]);
   const [search, setSearch] = useState("");
   const [platform, setPlatform] = useState("ALL");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [error, setError] = useState("");
 
-  async function refresh(nextSearch = search, nextPlatform = platform) {
+  async function refresh(
+    nextSearch = search,
+    nextPlatform = platform,
+    nextPage = page,
+    nextPageSize = pageSize
+  ) {
     setIsLoading(true);
     setError("");
 
     const result = await loadMessages(token, {
+      limit: nextPageSize,
+      offset: nextPage * nextPageSize,
       search: nextSearch,
       platform: nextPlatform
     });
@@ -131,11 +143,14 @@ export function DashboardPage({
     }
 
     setItems(result.items);
+    setPage(nextPage);
+    setPageSize(nextPageSize);
+    setHasNextPage(result.items.length === nextPageSize);
     setIsLoading(false);
   }
 
   useEffect(() => {
-    void refresh("", "ALL");
+    void refresh("", "ALL", 0, PAGE_SIZE);
   }, []);
 
   return (
@@ -175,10 +190,28 @@ export function DashboardPage({
             </select>
           </label>
 
+          <label className="dashboard-select">
+            <span>Размер страницы</span>
+            <select
+              aria-label="Размер страницы"
+              value={String(pageSize)}
+              onChange={(event) => {
+                const nextPageSize = Number(event.target.value);
+                void refresh(search, platform, 0, nextPageSize);
+              }}
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <button
             type="button"
             className="dashboard-refresh"
-            onClick={() => void refresh()}
+            onClick={() => void refresh(search, platform, 0, pageSize)}
           >
             {isLoading ? "Загрузка..." : "Обновить"}
           </button>
@@ -235,6 +268,28 @@ export function DashboardPage({
 
         {!isLoading && items.length === 0 && !error ? (
           <div className="dashboard-empty">Сообщения пока не найдены.</div>
+        ) : null}
+
+        {!error && items.length > 0 ? (
+          <div className="dashboard-pagination">
+            <span className="dashboard-pagination__status">Страница {page + 1}</span>
+            <button
+              type="button"
+              className="dashboard-page-button"
+              disabled={isLoading || page === 0}
+              onClick={() => void refresh(search, platform, page - 1, pageSize)}
+            >
+              Назад
+            </button>
+            <button
+              type="button"
+              className="dashboard-page-button"
+              disabled={isLoading || !hasNextPage}
+              onClick={() => void refresh(search, platform, page + 1, pageSize)}
+            >
+              Вперёд
+            </button>
+          </div>
         ) : null}
       </section>
     </main>

@@ -29,9 +29,11 @@ public class MessageController {
             @RequestParam(required = false) Long authorId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-            @RequestParam(required = false) String search
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset
     ) {
-        return messageQueryService.getMessages(platform, conversationId, authorId, from, to, search);
+        return messageQueryService.getMessages(platform, conversationId, authorId, from, to, search, limit, offset);
     }
 
     @GetMapping("/{id}")
