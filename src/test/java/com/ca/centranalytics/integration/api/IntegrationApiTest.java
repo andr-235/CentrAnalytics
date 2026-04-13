@@ -380,6 +380,16 @@ class IntegrationApiTest {
     }
 
     @Test
+    @WithMockUser(username = "reader", roles = "USER")
+    void returnsOverviewForAuthenticatedUser() throws Exception {
+        mockMvc.perform(get("/api/overview").param("window", "24h"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.window").value("24h"))
+                .andExpect(jsonPath("$.summary.messageCount").isNumber())
+                .andExpect(jsonPath("$.platforms").isArray());
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void allowsAdminEndpointsForAdmins() throws Exception {
         mockMvc.perform(get("/api/raw-events/{id}", rawEventId))

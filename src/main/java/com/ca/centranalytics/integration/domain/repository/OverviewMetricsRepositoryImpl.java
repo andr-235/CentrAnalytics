@@ -77,10 +77,20 @@ public class OverviewMetricsRepositoryImpl implements OverviewMetricsRepository 
 
         return rows.stream()
                 .map(row -> new OverviewTrendBucket(
-                        ((Timestamp) row[0]).toInstant(),
+                        instantValue(row[0]),
                         numberValue(row[1])
                 ))
                 .toList();
+    }
+
+    private Instant instantValue(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        throw new IllegalArgumentException("Unsupported overview bucket value: " + value);
     }
 
     private long numberValue(Object value) {
