@@ -128,4 +128,47 @@ class MaxWebhookControllerTest {
                     assertThat(attachment.getMimeType()).isEqualTo("application/pdf");
                 });
     }
+
+    @Test
+    void acceptsIncomingMessageWhenMediaInfoIsAnObject() throws Exception {
+        mockMvc.perform(post("/api/integrations/webhooks/wappi/max")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "messages": [
+                                    {
+                                      "wh_type": "incoming_message",
+                                      "profile_id": "max-profile-2",
+                                      "id": "msg-3",
+                                      "body": "https://files.example/image.jpg",
+                                      "type": "image",
+                                      "from": "user-3",
+                                      "to": "bot-1",
+                                      "senderName": "Sender",
+                                      "chatId": "chat-3",
+                                      "timestamp": "2026-04-13T10:18:30+03:00",
+                                      "caption": "Картинка",
+                                      "media_info": {
+                                        "width": 1024,
+                                        "height": 768
+                                      },
+                                      "mimetype": "image/jpeg",
+                                      "file_link": "https://files.example/image.jpg"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("accepted"))
+                .andExpect(jsonPath("$.processed").value(1));
+
+        assertThat(rawEventRepository.findAll()).hasSize(1);
+        assertThat(messageRepository.findAll()).hasSize(1);
+        assertThat(messageAttachmentRepository.findAll()).singleElement()
+                .satisfies(attachment -> {
+                    assertThat(attachment.getAttachmentType()).isEqualTo("image");
+                    assertThat(attachment.getUrl()).isEqualTo("https://files.example/image.jpg");
+                    assertThat(attachment.getMimeType()).isEqualTo("image/jpeg");
+                });
+    }
 }

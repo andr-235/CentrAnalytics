@@ -16,7 +16,7 @@ public record MaxMessageDto(
         Long time,
         String caption,
         String mimetype,
-        @JsonProperty("media_info") String mediaInfo,
+        @JsonProperty("media_info") Object mediaInfo,
         @JsonProperty("file_name") String fileName,
         @JsonProperty("file_link") String fileLink,
         @JsonProperty("is_forwarded") Boolean isForwarded,

@@ -322,6 +322,64 @@ class IntegrationApiTest {
     }
 
     @Test
+    @WithMockUser(username = "reader", roles = "USER")
+    void acceptsWhatsappAliasAndMapsItToWappiPlatform() throws Exception {
+        IntegrationSource source = integrationSourceRepository.save(IntegrationSource.builder()
+                .platform(Platform.WAPPI)
+                .name("Wappi Demo")
+                .status(IntegrationStatus.ACTIVE)
+                .settingsJson("{\"profileId\":\"demo\"}")
+                .build());
+
+        ExternalUser author = externalUserRepository.save(ExternalUser.builder()
+                .platform(Platform.WAPPI)
+                .source(source)
+                .externalUserId("wa-user-1")
+                .displayName("Wappi User")
+                .metadataJson("{}")
+                .build());
+
+        Conversation conversation = conversationRepository.save(Conversation.builder()
+                .source(source)
+                .platform(Platform.WAPPI)
+                .externalConversationId("wa-chat-1")
+                .type(ConversationType.DIRECT)
+                .title("Wappi Chat")
+                .metadataJson("{}")
+                .build());
+
+        RawEvent rawEvent = rawEventRepository.save(RawEvent.builder()
+                .platform(Platform.WAPPI)
+                .eventId("wappi-event-1")
+                .eventType("incoming_message")
+                .receivedAt(Instant.parse("2026-04-05T00:00:00Z"))
+                .payloadJson("{\"messages\":[]}")
+                .signatureValid(true)
+                .processingStatus(ProcessingStatus.PERSISTED)
+                .build());
+
+        messageRepository.save(Message.builder()
+                .conversation(conversation)
+                .platform(Platform.WAPPI)
+                .externalMessageId("wa-msg-1")
+                .author(author)
+                .sentAt(Instant.parse("2026-04-05T00:00:00Z"))
+                .text("Hello from WhatsApp")
+                .normalizedText("hello from whatsapp")
+                .messageType(MessageType.TEXT)
+                .hasAttachments(false)
+                .rawEvent(rawEvent)
+                .ingestionStatus(ProcessingStatus.PERSISTED)
+                .build());
+
+        mockMvc.perform(get("/api/messages").param("platform", "WHATSAPP"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].platform").value("WAPPI"))
+                .andExpect(jsonPath("$[0].externalMessageId").value("wa-msg-1"));
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void allowsAdminEndpointsForAdmins() throws Exception {
         mockMvc.perform(get("/api/raw-events/{id}", rawEventId))
