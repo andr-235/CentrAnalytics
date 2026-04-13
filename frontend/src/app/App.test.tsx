@@ -182,4 +182,64 @@ describe("App", () => {
     vi.restoreAllMocks();
     window.localStorage.removeItem("centranalytics.token");
   });
+
+  it("routes max sources to a dedicated platform page", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("centranalytics.token", "demo-token");
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(overviewPayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    render(<App />);
+
+    await screen.findByRole("heading", { name: /обзор/i });
+    await user.click(
+      screen.getByRole("button", { name: /max.*источники и сообщения платформы max/i })
+    );
+    await user.click(screen.getByRole("button", { name: /^источники$/i }));
+
+    expect(await screen.findByRole("heading", { name: /max/i, level: 1 })).toBeInTheDocument();
+    expect(
+      screen.getByText(/read-only webhook ingress для входящих сообщений max через wappi/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("/api/integrations/webhooks/wappi/max")).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+    window.localStorage.removeItem("centranalytics.token");
+  });
+
+  it("routes whatsapp webhook to a dedicated platform page", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("centranalytics.token", "demo-token");
+    vi.spyOn(window, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(overviewPayload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    render(<App />);
+
+    await screen.findByRole("heading", { name: /обзор/i });
+    await user.click(
+      screen.getByRole("button", {
+        name: /whatsapp.*входящий канал, webhook и источники/i
+      })
+    );
+    await user.click(screen.getByRole("button", { name: /^webhook$/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /whatsapp/i, level: 1 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/операционный экран inbound webhook-канала whatsapp через wappi/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("/api/integrations/webhooks/wappi")).toBeInTheDocument();
+
+    vi.restoreAllMocks();
+    window.localStorage.removeItem("centranalytics.token");
+  });
 });

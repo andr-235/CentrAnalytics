@@ -66,15 +66,19 @@ class OverviewQueryServiceTest {
         assertThat(response.platforms())
                 .filteredOn(item -> item.platform().equals(OverviewPlatform.MAX.apiValue()))
                 .first()
-                .extracting(item -> item.status())
-                .isEqualTo("inactive");
+                .satisfies(item -> {
+                    assertThat(item.status()).isEqualTo("healthy");
+                    assertThat(item.integration().detail()).isEqualTo("Источники MAX: 1");
+                    assertThat(item.trend()).hasSize(1);
+                });
     }
 
     private OverviewMetricsRepository overviewMetricsRepository() {
         Map<Platform, List<OverviewTrendBucket>> trends = Map.of(
                 Platform.TELEGRAM, List.of(new OverviewTrendBucket(Instant.parse("2026-04-10T09:00:00Z"), 12)),
                 Platform.VK, List.of(new OverviewTrendBucket(Instant.parse("2026-04-10T06:00:00Z"), 5)),
-                Platform.WAPPI, List.of()
+                Platform.WAPPI, List.of(),
+                Platform.MAX, List.of(new OverviewTrendBucket(Instant.parse("2026-04-10T08:00:00Z"), 4))
         );
 
         return new OverviewMetricsRepository() {
@@ -88,7 +92,8 @@ class OverviewQueryServiceTest {
                 return List.of(
                         new OverviewPlatformMetrics(Platform.TELEGRAM, 90, 12, 30, Instant.parse("2026-04-10T10:00:00Z")),
                         new OverviewPlatformMetrics(Platform.VK, 30, 6, 14, Instant.parse("2026-04-10T02:30:00Z")),
-                        new OverviewPlatformMetrics(Platform.WAPPI, 0, 0, 0, null)
+                        new OverviewPlatformMetrics(Platform.WAPPI, 0, 0, 0, null),
+                        new OverviewPlatformMetrics(Platform.MAX, 8, 2, 5, Instant.parse("2026-04-10T09:45:00Z"))
                 );
             }
 
@@ -103,7 +108,8 @@ class OverviewQueryServiceTest {
         Map<Platform, List<IntegrationSource>> sources = Map.of(
                 Platform.TELEGRAM, List.of(source(1L, Platform.TELEGRAM, IntegrationStatus.ACTIVE, "Telegram Source")),
                 Platform.VK, List.of(source(2L, Platform.VK, IntegrationStatus.ACTIVE, "VK Source")),
-                Platform.WAPPI, List.of()
+                Platform.WAPPI, List.of(),
+                Platform.MAX, List.of(source(3L, Platform.MAX, IntegrationStatus.ACTIVE, "MAX Source"))
         );
 
         return (IntegrationSourceRepository) Proxy.newProxyInstance(

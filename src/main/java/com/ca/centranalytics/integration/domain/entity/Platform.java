@@ -4,5 +4,6 @@ public enum Platform {
     VK,
     TELEGRAM,
     WAPPI,
+    MAX,
     ODNOKLASSNIKI
 }

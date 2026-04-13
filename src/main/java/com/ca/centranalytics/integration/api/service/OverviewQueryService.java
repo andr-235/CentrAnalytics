@@ -168,7 +168,9 @@ public class OverviewQueryService {
             case WHATSAPP -> context.sourceCount() > 0
                     ? "Источники Wappi: " + context.sourceCount()
                     : "Webhook и источники не настроены";
-            case MAX -> "Платформа ещё не подключена";
+            case MAX -> context.sourceCount() > 0
+                    ? "Источники MAX: " + context.sourceCount()
+                    : "Webhook и источники не настроены";
         };
 
         return new PlatformIntegrationStatusResponse(
@@ -223,10 +225,6 @@ public class OverviewQueryService {
     }
 
     private String resolveStatus(OverviewPlatform platform, PlatformContext context, Instant now) {
-        if (platform == OverviewPlatform.MAX) {
-            return "inactive";
-        }
-
         if (context.sourceCount() == 0 && context.messageCount() == 0) {
             return "inactive";
         }

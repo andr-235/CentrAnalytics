@@ -6,7 +6,7 @@ public enum OverviewPlatform {
     TELEGRAM("TELEGRAM", "Telegram", Platform.TELEGRAM),
     VK("VK", "VK", Platform.VK),
     WHATSAPP("WHATSAPP", "WhatsApp", Platform.WAPPI),
-    MAX("MAX", "Max", null);
+    MAX("MAX", "Max", Platform.MAX);
 
     private final String apiValue;
     private final String label;

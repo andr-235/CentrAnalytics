@@ -2,8 +2,10 @@ import { useState } from "react";
 
 import { AuthPage } from "../features/auth/AuthPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { MaxWebhookPage } from "../features/integrations/MaxWebhookPage";
 import { TelegramSessionPage } from "../features/integrations/TelegramSessionPage";
 import { VkGroupsPage } from "../features/integrations/VkGroupsPage";
+import { WhatsappWebhookPage } from "../features/integrations/WhatsappWebhookPage";
 import { OverviewPage } from "../features/overview/OverviewPage";
 import { AppShell } from "../features/shell/AppShell";
 import type {
@@ -147,6 +149,17 @@ export default function App() {
 
     if (activePrimary === "vk" && (activeSecondary === "groups" || activeSecondary === "collection")) {
       return <VkGroupsPage token={token} onUnauthorized={clearSession} />;
+    }
+
+    if (activePrimary === "max" && (activeSecondary === "sources" || activeSecondary === "webhook")) {
+      return <MaxWebhookPage token={token} onUnauthorized={clearSession} />;
+    }
+
+    if (
+      activePrimary === "whatsapp" &&
+      (activeSecondary === "sources" || activeSecondary === "webhook")
+    ) {
+      return <WhatsappWebhookPage token={token} onUnauthorized={clearSession} />;
     }
 
     return (

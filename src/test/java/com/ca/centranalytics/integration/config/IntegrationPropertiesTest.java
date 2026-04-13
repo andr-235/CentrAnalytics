@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
@@ -39,7 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.telegram-user.system-language-code=ru",
         "integration.telegram-user.device-model=CentrAnalytics",
         "integration.telegram-user.system-version=server",
-        "integration.telegram-user.application-version=1.0.0"
+        "integration.telegram-user.application-version=1.0.0",
+        "integration.max.webhook-path=/api/integrations/webhooks/wappi/max"
 })
 class IntegrationPropertiesTest {
 
@@ -51,6 +53,9 @@ class IntegrationPropertiesTest {
 
     @Autowired
     private TelegramUserProperties telegramUserProperties;
+
+    @Autowired
+    private Environment environment;
 
     @Test
     void bindsVkDiscoveryAndTelegramUserProperties() {
@@ -79,6 +84,12 @@ class IntegrationPropertiesTest {
         assertThat(telegramUserProperties.deviceModel()).isEqualTo("CentrAnalytics");
         assertThat(telegramUserProperties.systemVersion()).isEqualTo("server");
         assertThat(telegramUserProperties.applicationVersion()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void exposesMaxWebhookPathProperty() {
+        assertThat(environment.getProperty("integration.max.webhook-path"))
+                .isEqualTo("/api/integrations/webhooks/wappi/max");
     }
 
     @Configuration
