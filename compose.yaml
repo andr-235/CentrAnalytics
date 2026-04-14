@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: "postgres:latest"
+    image: "postgres:17"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-centranalytics}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -13,6 +13,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build: .
     ports:
@@ -20,7 +30,7 @@ services:
     volumes:
       - telegram_tdlib_data:/app/.tdlib
     environment:
-      JWT_SECRET: ${JWT_SECRET:-ZGV2LW9ubHktand0LXNlY3JldC1yZXBsYWNlLW1lLXdpdGgtZW52}
+      JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-centranalytics}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
@@ -34,6 +44,8 @@ services:
       TELEGRAM_USER_DEVICE_MODEL: ${TELEGRAM_USER_DEVICE_MODEL:-CentrAnalytics}
       TELEGRAM_USER_SYSTEM_VERSION: ${TELEGRAM_USER_SYSTEM_VERSION:-server}
       TELEGRAM_USER_APPLICATION_VERSION: ${TELEGRAM_USER_APPLICATION_VERSION:-1.0.0}
+      TELEGRAM_GATEWAY_INGESTION_ENABLED: ${TELEGRAM_GATEWAY_INGESTION_ENABLED:-false}
+      TELEGRAM_GATEWAY_INGESTION_INTERNAL_TOKEN: ${TELEGRAM_GATEWAY_INGESTION_INTERNAL_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy

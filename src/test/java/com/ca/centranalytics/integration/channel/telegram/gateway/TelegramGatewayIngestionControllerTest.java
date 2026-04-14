@@ -14,40 +14,18 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TelegramGatewayIngestionControllerTest {
 
     @Test
-    void acceptsTrustedTelegramEventAndDelegatesToIngestionService() {
+    void controllerDelegatesIngestionToService() {
         RecordingTelegramGatewayIngestionService service = new RecordingTelegramGatewayIngestionService();
-        TelegramGatewayIngestionController controller = new TelegramGatewayIngestionController(
-                new TelegramGatewayIngestionProperties(true, "test-internal-token"),
-                service
-        );
+        TelegramGatewayIngestionController controller = new TelegramGatewayIngestionController(service);
 
-        Map<String, Object> response = controller.ingest("test-internal-token", validEvent());
-
-        assertThat(response).containsEntry("status", "accepted");
+        assertThat(controller.ingest(validEvent())).containsEntry("status", "accepted");
         assertThat(service.recordedEvent).isEqualTo(validEvent());
-    }
-
-    @Test
-    void rejectsRequestWithInvalidInternalToken() {
-        RecordingTelegramGatewayIngestionService service = new RecordingTelegramGatewayIngestionService();
-        TelegramGatewayIngestionController controller = new TelegramGatewayIngestionController(
-                new TelegramGatewayIngestionProperties(true, "test-internal-token"),
-                service
-        );
-
-        assertThatThrownBy(() -> controller.ingest("wrong-token", validEvent()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Invalid internal token");
-
-        assertThat(service.recordedEvent).isNull();
     }
 
     private InboundIntegrationEvent validEvent() {

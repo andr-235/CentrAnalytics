@@ -44,6 +44,8 @@ class AuthControllerIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private static final String VALID_PASSWORD = "Test1234!";
+
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
@@ -53,7 +55,7 @@ class AuthControllerIntegrationTest {
     void testRegister_Success() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("testuser");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -66,14 +68,14 @@ class AuthControllerIntegrationTest {
     void testRegister_UserAlreadyExists() throws Exception {
         User existingUser = User.builder()
                 .username("existinguser")
-                .password(passwordEncoder.encode("password123"))
+                .password(passwordEncoder.encode(VALID_PASSWORD))
                 .role(Role.USER)
                 .build();
         userRepository.save(existingUser);
 
         RegisterRequest request = new RegisterRequest();
         request.setUsername("existinguser");
-        request.setPassword("newpassword123");
+        request.setPassword("Newpass123!");
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +88,7 @@ class AuthControllerIntegrationTest {
     void testRegister_ValidationFailure_EmptyUsername() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,7 +114,7 @@ class AuthControllerIntegrationTest {
     void testRegister_ValidationFailure_InvalidUsername() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("ab");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -125,14 +127,14 @@ class AuthControllerIntegrationTest {
     void testLogin_Success() throws Exception {
         User user = User.builder()
                 .username("loginuser")
-                .password(passwordEncoder.encode("password123"))
+                .password(passwordEncoder.encode(VALID_PASSWORD))
                 .role(Role.USER)
                 .build();
         userRepository.save(user);
 
         AuthRequest request = new AuthRequest();
         request.setUsername("loginuser");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -145,14 +147,14 @@ class AuthControllerIntegrationTest {
     void testLogin_InvalidCredentials() throws Exception {
         User user = User.builder()
                 .username("testuser2")
-                .password(passwordEncoder.encode("password123"))
+                .password(passwordEncoder.encode(VALID_PASSWORD))
                 .role(Role.USER)
                 .build();
         userRepository.save(user);
 
         AuthRequest request = new AuthRequest();
         request.setUsername("testuser2");
-        request.setPassword("wrongpassword");
+        request.setPassword("Wrongpass1!");
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -165,7 +167,7 @@ class AuthControllerIntegrationTest {
     void testLogin_UserNotFound() throws Exception {
         AuthRequest request = new AuthRequest();
         request.setUsername("nonexistentuser");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -178,7 +180,7 @@ class AuthControllerIntegrationTest {
     void testLogin_ValidationFailure_EmptyUsername() throws Exception {
         AuthRequest request = new AuthRequest();
         request.setUsername("");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -225,7 +227,7 @@ class AuthControllerIntegrationTest {
     void testProtectedRoot_WithValidToken_Success() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("secureduser");
-        request.setPassword("password123");
+        request.setPassword(VALID_PASSWORD);
 
         String responseBody = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

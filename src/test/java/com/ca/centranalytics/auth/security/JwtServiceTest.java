@@ -16,9 +16,10 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("c3VwZXJfc2VjcmV0X2tleV9mb3Jfand0X3Rva2VuX3NpZ25pbmdfYW5kX3ZhbGlkYXRpb24=");
-        properties.setExpiration(86400000L);
+        JwtProperties properties = new JwtProperties(
+                "c3VwZXJfc2VjcmV0X2tleV9mb3Jfand0X3Rva2VuX3NpZ25pbmdfYW5kX3ZhbGlkYXRpb25fcHVycG9zZXNfMTIzNDU2Nzg5MA==",
+                86400000L
+        );
         jwtService = new JwtService(properties);
     }
 
@@ -93,9 +94,10 @@ class JwtServiceTest {
 
     @Test
     void testExtractUsername_ExpiredToken() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("c3VwZXJfc2VjcmV0X2tleV9mb3Jfand0X3Rva2VuX3NpZ25pbmdfYW5kX3ZhbGlkYXRpb24=");
-        properties.setExpiration(-1L);
+        JwtProperties properties = new JwtProperties(
+                "c3VwZXJfc2VjcmV0X2tleV9mb3Jfand0X3Rva2VuX3NpZ25pbmdfYW5kX3ZhbGlkYXRpb25fcHVycG9zZXNfMTIzNDU2Nzg5MA==",
+                -1L
+        );
         JwtService expiredJwtService = new JwtService(properties);
 
         UserDetails userDetails = User.builder()
@@ -110,13 +112,20 @@ class JwtServiceTest {
     }
 
     @Test
-    void rejectsKnownDefaultSecret() {
-        JwtProperties properties = new JwtProperties();
-        properties.setSecret("ZGV2LW9ubHktand0LXNlY3JldC1yZXBsYWNlLW1lLXdpdGgtZW52");
-        properties.setExpiration(86400000L);
+    void rejectsNullOrBlankSecret() {
+        JwtProperties blankProperties = new JwtProperties(null, 86400000L);
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtService(properties));
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtService(blankProperties));
 
-        assertEquals("JWT secret must be explicitly configured and must not use the default fallback", exception.getMessage());
+        assertEquals("JWT secret must be explicitly configured", exception.getMessage());
+    }
+
+    @Test
+    void rejectsShortSecret() {
+        JwtProperties shortSecret = new JwtProperties("c2hvcnQ=", 86400000L);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> new JwtService(shortSecret));
+
+        assertEquals("JWT secret must be at least 64 bytes (base64-encoded) for HS512 algorithm", exception.getMessage());
     }
 }

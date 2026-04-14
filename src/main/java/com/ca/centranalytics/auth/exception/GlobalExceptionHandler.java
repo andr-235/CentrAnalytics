@@ -5,6 +5,7 @@ import com.ca.centranalytics.integration.api.exception.IntegrationNotFoundExcept
 import com.ca.centranalytics.integration.api.exception.WebhookVerificationException;
 import com.ca.centranalytics.integration.channel.telegram.user.exception.TelegramUserModeDisabledException;
 import com.ca.centranalytics.integration.channel.telegram.user.exception.TelegramUserSessionConflictException;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureException;
@@ -12,6 +13,7 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageConversionException;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,8 +55,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
     }
 
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleCustomAuthenticationException(AuthenticationException ex) {
+    @ExceptionHandler(CustomAuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleCustomAuthenticationException(CustomAuthenticationException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
@@ -105,6 +109,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TelegramUserModeDisabledException.class)
     public ResponseEntity<ErrorResponse> handleTelegramUserModeDisabled(TelegramUserModeDisabledException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(RequestNotPermitted ex) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Retry-After", "60");
+        headers.add("X-RateLimit-Retry-After", Instant.now().plus(60, ChronoUnit.SECONDS).toString());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .headers(headers)
+                .body(new ErrorResponse("Too many requests. Please try again later."));
     }
 
     @ExceptionHandler(Exception.class)

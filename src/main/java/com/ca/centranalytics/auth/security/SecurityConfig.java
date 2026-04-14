@@ -1,7 +1,11 @@
 package com.ca.centranalytics.auth.security;
 
+import com.ca.centranalytics.common.config.CorsProperties;
+import com.ca.centranalytics.integration.channel.telegram.gateway.config.TelegramGatewayIngestionProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -11,33 +15,42 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
+@EnableConfigurationProperties({TelegramGatewayIngestionProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost:5173}")
-    private List<String> allowedOrigins;
+    @Value("${integration.webhook.secret:}")
+    private String webhookSecret;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService userDetailsService;
+    private final TelegramGatewayIngestionProperties telegramGatewayIngestionProperties;
+    private final ObjectMapper objectMapper;
+    private final CorsProperties corsProperties;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> {
+                        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
+                        csrf.csrfTokenRepository(repository)
+                                .ignoringRequestMatchers("/api/integrations/webhooks/**");
+                })
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -54,10 +67,10 @@ public class SecurityConfig {
                                 "/api-docs",
                                 "/api-docs/**",
                                 "/v3/api-docs/**",
-                                "/api/integrations/webhooks/**",
-                                "/api/internal/integrations/**"
+                                "/api/integrations/webhooks/**"
                         ).permitAll()
-                        .requestMatchers("/api/admin/integrations/**").authenticated()
+                        .requestMatchers("/api/internal/**").authenticated()
+                        .requestMatchers("/api/admin/integrations/**").hasRole("ADMIN")
                         .requestMatchers("/api/raw-events/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -68,9 +81,31 @@ public class SecurityConfig {
                     response.getWriter().write("{\"error\":\"Authentication is required\"}");
                 }))
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(webhookSignatureFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(internalTokenFilter(), JwtAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public WebhookSignatureFilter webhookSignatureFilter() {
+        return new WebhookSignatureFilter(webhookSecret, objectMapper);
+    }
+
+    @Bean
+    public InternalTokenFilter internalTokenFilter() {
+        validateInternalTokenConfiguration();
+        return new InternalTokenFilter(telegramGatewayIngestionProperties, objectMapper);
+    }
+
+    private void validateInternalTokenConfiguration() {
+        if (telegramGatewayIngestionProperties.enabled()
+                && !StringUtils.hasText(telegramGatewayIngestionProperties.internalToken())) {
+            throw new IllegalStateException(
+                    "Telegram gateway ingestion is enabled but internal token is not configured. " +
+                    "Set integration.telegram-gateway-ingestion.internal-token in your environment.");
+        }
     }
 
     @Bean
@@ -93,11 +128,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(corsProperties.allowedMethods());
+        configuration.setAllowedHeaders(corsProperties.allowedHeaders());
+        configuration.setExposedHeaders(corsProperties.exposedHeaders());
+        configuration.setAllowCredentials(corsProperties.allowCredentials());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
