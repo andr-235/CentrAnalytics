@@ -4,6 +4,9 @@ import com.ca.centranalytics.auth.security.CustomUserDetailsService;
 import com.ca.centranalytics.auth.security.JwtAuthenticationFilter;
 import com.ca.centranalytics.auth.security.SecurityConfig;
 import com.ca.centranalytics.auth.service.AuthService;
+import com.ca.centranalytics.common.config.CorsProperties;
+import com.ca.centranalytics.integration.channel.telegram.gateway.config.TelegramGatewayIngestionProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -49,6 +52,27 @@ class AuthCorsMvcTest {
         @Bean
         CustomUserDetailsService customUserDetailsService() {
             return new CustomUserDetailsService(null);
+        }
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper();
+        }
+
+        @Bean
+        TelegramGatewayIngestionProperties telegramGatewayIngestionProperties() {
+            return new TelegramGatewayIngestionProperties(false, null);
+        }
+
+        @Bean
+        CorsProperties corsProperties() {
+            return new CorsProperties(
+                    java.util.List.of("http://localhost:5173"),
+                    java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"),
+                    java.util.List.of("*"),
+                    java.util.List.of(),
+                    true
+            );
         }
     }
 }

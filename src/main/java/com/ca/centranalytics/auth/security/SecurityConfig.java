@@ -15,13 +15,11 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -46,11 +44,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> {
-                        CookieCsrfTokenRepository repository = new CookieCsrfTokenRepository();
-                        csrf.csrfTokenRepository(repository)
-                                .ignoringRequestMatchers("/api/integrations/webhooks/**");
-                })
+                .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -70,7 +64,7 @@ public class SecurityConfig {
                                 "/api/integrations/webhooks/**"
                         ).permitAll()
                         .requestMatchers("/api/internal/**").authenticated()
-                        .requestMatchers("/api/admin/integrations/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/integrations/**").authenticated()
                         .requestMatchers("/api/raw-events/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -82,18 +76,20 @@ public class SecurityConfig {
                 }))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(webhookSignatureFilter(), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(internalTokenFilter(), JwtAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterAfter(internalTokenFilter(), WebhookSignatureFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, InternalTokenFilter.class);
 
         return http.build();
     }
 
     @Bean
+    @org.springframework.core.annotation.Order(0)
     public WebhookSignatureFilter webhookSignatureFilter() {
         return new WebhookSignatureFilter(webhookSecret, objectMapper);
     }
 
     @Bean
+    @org.springframework.core.annotation.Order(2)
     public InternalTokenFilter internalTokenFilter() {
         validateInternalTokenConfiguration();
         return new InternalTokenFilter(telegramGatewayIngestionProperties, objectMapper);
