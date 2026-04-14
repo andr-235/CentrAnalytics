@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,6 +73,52 @@ class VkAutoCollectionServiceTest {
     }
 
     @Test
+    void skipsCommentCollectionWhenGroupPostsJobFails() {
+        RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
+        vkCrawlCommandService.failedGroupPostIds.add(1001L);
+        VkAutoCollectionService service = new VkAutoCollectionService(
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                vkCrawlCommandService,
+                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
+        );
+
+        service.collect();
+
+        assertThat(vkCrawlCommandService.postRequests)
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+        assertThat(vkCrawlCommandService.commentRequests).isEmpty();
+    }
+
+    @Test
+    void continuesCollectingWhenSingleGroupFails() {
+        RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
+        vkCrawlCommandService.groupPostExceptions.add(1001L);
+        VkAutoCollectionService service = new VkAutoCollectionService(
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                vkCrawlCommandService,
+                groupRepository(List.of(
+                        VkGroupCandidate.builder().vkGroupId(1001L).build(),
+                        VkGroupCandidate.builder().vkGroupId(2002L).build()
+                )),
+                wallPostRepository(List.of(
+                        VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
+                        VkWallPostSnapshot.builder().ownerId(-2002L).postId(4004L).build()
+                ))
+        );
+
+        service.collect();
+
+        assertThat(vkCrawlCommandService.postRequests)
+                .containsExactly(
+                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")),
+                        new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10, "HYBRID"))
+                );
+        assertThat(vkCrawlCommandService.commentRequests)
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20, "HYBRID"));
+    }
+
+    @Test
     void doesNothingWhenAutoCollectionIsDisabled() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
@@ -107,7 +155,10 @@ class VkAutoCollectionServiceTest {
                 new Class[]{VkWallPostSnapshotRepository.class},
                 (proxy, method, args) -> {
                     if ("findAllByOwnerIdOrderByUpdatedAtDesc".equals(method.getName())) {
-                        return posts;
+                        Long ownerId = (Long) args[0];
+                        return posts.stream()
+                                .filter(post -> ownerId.equals(post.getOwnerId()))
+                                .toList();
                     }
                     throw new UnsupportedOperationException(method.getName());
                 }
@@ -119,6 +170,8 @@ class VkAutoCollectionServiceTest {
         private final List<SearchVkUsersRequest> userSearchRequests = new ArrayList<>();
         private final List<GroupPostCall> postRequests = new ArrayList<>();
         private final List<CollectVkPostCommentsRequest> commentRequests = new ArrayList<>();
+        private final Set<Long> failedGroupPostIds = new HashSet<>();
+        private final Set<Long> groupPostExceptions = new HashSet<>();
 
         private RecordingVkCrawlCommandService() {
             super(null, null);
@@ -139,6 +192,12 @@ class VkAutoCollectionServiceTest {
         @Override
         public VkCrawlJobResponse createGroupPostsJob(Long groupId, CollectVkGroupPostsRequest request) {
             postRequests.add(new GroupPostCall(groupId, request));
+            if (groupPostExceptions.contains(groupId)) {
+                throw new IllegalStateException("VK Access denied");
+            }
+            if (failedGroupPostIds.contains(groupId)) {
+                return new VkCrawlJobResponse(2L, VkCrawlJobType.GROUP_POSTS, VkCrawlJobStatus.FAILED);
+            }
             return new VkCrawlJobResponse(2L, VkCrawlJobType.GROUP_POSTS, VkCrawlJobStatus.COMPLETED);
         }
 
