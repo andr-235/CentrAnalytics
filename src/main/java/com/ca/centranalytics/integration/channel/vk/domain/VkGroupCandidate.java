@@ -62,6 +62,9 @@ public class VkGroupCandidate {
     @Column(name = "raw_json", nullable = false, columnDefinition = "text")
     private String rawJson;
 
+    @Column(name = "post_collection_blocked_until")
+    private Instant postCollectionBlockedUntil;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

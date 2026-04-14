@@ -5,11 +5,11 @@ import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsReq
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
 import com.ca.centranalytics.integration.channel.vk.api.VkCrawlJobResponse;
-import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.config.VkAutoCollectionProperties;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobStatus;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCrawlJobType;
 import com.ca.centranalytics.integration.channel.vk.domain.VkGroupCandidate;
+import com.ca.centranalytics.integration.channel.vk.domain.VkMatchSource;
 import com.ca.centranalytics.integration.channel.vk.domain.VkWallPostSnapshot;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkWallPostSnapshotRepository;
@@ -18,6 +18,7 @@ import com.ca.centranalytics.integration.channel.vk.service.VkCrawlCommandServic
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,7 +34,7 @@ class VkAutoCollectionServiceTest {
         VkAutoCollectionService service = new VkAutoCollectionService(
                 new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
-                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
+                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3004L).build()
@@ -79,7 +80,7 @@ class VkAutoCollectionServiceTest {
         VkAutoCollectionService service = new VkAutoCollectionService(
                 new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
-                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
+                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
         );
 
@@ -98,8 +99,8 @@ class VkAutoCollectionServiceTest {
                 new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(
-                        VkGroupCandidate.builder().vkGroupId(1001L).build(),
-                        VkGroupCandidate.builder().vkGroupId(2002L).build()
+                        VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build(),
+                        VkGroupCandidate.builder().vkGroupId(2002L).regionMatchSource(VkMatchSource.TEXT).build()
                 )),
                 wallPostRepository(List.of(
                         VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
@@ -119,12 +120,58 @@ class VkAutoCollectionServiceTest {
     }
 
     @Test
+    void skipsGroupsWithActivePostCollectionBlock() {
+        RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
+        VkAutoCollectionService service = new VkAutoCollectionService(
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                vkCrawlCommandService,
+                groupRepository(List.of(
+                        VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).postCollectionBlockedUntil(Instant.now().plusSeconds(3600)).build(),
+                        VkGroupCandidate.builder().vkGroupId(2002L).regionMatchSource(VkMatchSource.TEXT).build()
+                )),
+                wallPostRepository(List.of(
+                        VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build(),
+                        VkWallPostSnapshot.builder().ownerId(-2002L).postId(4004L).build()
+                ))
+        );
+
+        service.collect();
+
+        assertThat(vkCrawlCommandService.postRequests)
+                .containsExactly(new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+        assertThat(vkCrawlCommandService.commentRequests)
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20, "HYBRID"));
+    }
+
+    @Test
+    void blocksGroupWhenPostsJobThrows() {
+        RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
+        vkCrawlCommandService.groupPostExceptions.add(1001L);
+        VkGroupCandidateRepository groups = groupRepository(List.of(
+                VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build()
+        ));
+        VkAutoCollectionService service = new VkAutoCollectionService(
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                vkCrawlCommandService,
+                groups,
+                wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
+        );
+
+        service.collect();
+
+        assertThat(groups.findByVkGroupId(1001L))
+                .get()
+                .extracting(VkGroupCandidate::getPostCollectionBlockedUntil)
+                .isNotNull();
+    }
+
+    @Test
     void doesNothingWhenAutoCollectionIsDisabled() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
                 new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
                 vkCrawlCommandService,
-                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).build())),
+                groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
         );
 
@@ -137,14 +184,20 @@ class VkAutoCollectionServiceTest {
     }
 
     private static VkGroupCandidateRepository groupRepository(List<VkGroupCandidate> groups) {
+        List<VkGroupCandidate> state = new ArrayList<>(groups);
         return (VkGroupCandidateRepository) Proxy.newProxyInstance(
                 VkGroupCandidateRepository.class.getClassLoader(),
                 new Class[]{VkGroupCandidateRepository.class},
-                (proxy, method, args) -> {
-                    if ("findAllByOrderByUpdatedAtDesc".equals(method.getName())) {
-                        return groups;
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "findAllByOrderByUpdatedAtDesc" -> new ArrayList<>(state);
+                    case "findByVkGroupId" -> state.stream().filter(group -> args[0].equals(group.getVkGroupId())).findFirst();
+                    case "save" -> {
+                        VkGroupCandidate entity = (VkGroupCandidate) args[0];
+                        state.removeIf(group -> entity.getVkGroupId().equals(group.getVkGroupId()));
+                        state.add(entity);
+                        yield entity;
                     }
-                    throw new UnsupportedOperationException(method.getName());
+                    default -> throw new UnsupportedOperationException(method.getName());
                 }
         );
     }
