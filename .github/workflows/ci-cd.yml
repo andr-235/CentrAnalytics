@@ -467,14 +467,29 @@ jobs:
           fi
 
           frontend_healthcheck_url="${FRONTEND_HEALTHCHECK_URL:-http://127.0.0.1:${frontend_port}/}"
-          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://app:8080/actuator/health}"
+          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-}"
 
           frontend_ready() {
             curl -fsS "$frontend_healthcheck_url" >/dev/null
           }
 
           backend_ready() {
-            "${compose_cmd[@]}" exec -T frontend wget -qO- "$backend_healthcheck_url" >/dev/null
+            local app_container_id
+            local app_container_ip
+
+            app_container_id="$(${compose_cmd[@]} ps -q app)"
+            if [ -z "$app_container_id" ]; then
+              return 1
+            fi
+
+            app_container_ip="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$app_container_id")"
+            if [ -z "$app_container_ip" ]; then
+              return 1
+            fi
+
+            local effective_backend_healthcheck_url
+            effective_backend_healthcheck_url="${backend_healthcheck_url:-http://${app_container_ip}:8080/actuator/health}"
+            curl -fsS "$effective_backend_healthcheck_url" >/dev/null
           }
 
           for _ in $(seq 1 36); do
@@ -487,7 +502,7 @@ jobs:
 
           echo "Health check failed" >&2
           echo "Frontend URL: $frontend_healthcheck_url" >&2
-          echo "Backend URL (from frontend container): $backend_healthcheck_url" >&2
+          echo "Backend URL: ${backend_healthcheck_url:-http://<app-container-ip>:8080/actuator/health}" >&2
           "${compose_cmd[@]}" ps >&2
           "${compose_cmd[@]}" logs --tail=120 app frontend >&2 || true
           exit 1
