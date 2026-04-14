@@ -6,12 +6,10 @@ import com.ca.centranalytics.integration.api.dto.OverviewResponse;
 import com.ca.centranalytics.integration.api.dto.OverviewSummaryResponse;
 import com.ca.centranalytics.integration.api.dto.OverviewTrendPointResponse;
 import com.ca.centranalytics.integration.api.dto.OverviewWindow;
-import com.ca.centranalytics.integration.api.dto.PlatformAttentionItemResponse;
 import com.ca.centranalytics.integration.api.dto.PlatformIntegrationStatusResponse;
 import com.ca.centranalytics.integration.api.dto.PlatformOverviewResponse;
 import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSession;
 import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSessionRepository;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSessionState;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.domain.entity.IntegrationSource;
 import com.ca.centranalytics.integration.domain.entity.IntegrationStatus;
@@ -24,13 +22,11 @@ import com.ca.centranalytics.integration.domain.repository.OverviewTrendBucket;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -49,6 +45,7 @@ public class OverviewQueryService {
     private final IntegrationSourceRepository integrationSourceRepository;
     private final TelegramUserSessionRepository telegramUserSessionRepository;
     private final VkGroupCandidateRepository vkGroupCandidateRepository;
+    private final PlatformStatusResolver platformStatusResolver;
 
     public OverviewResponse getOverview(OverviewWindow window, Instant now) {
         Instant from = now.minus(window.duration());
@@ -127,7 +124,7 @@ public class OverviewQueryService {
                 platform == OverviewPlatform.VK ? vkGroupCandidateRepository.count() : 0L
         );
 
-        String status = resolveStatus(platform, context, now);
+        String status = platformStatusResolver.resolveStatus(platform, context, now);
 
         return new PlatformOverviewResponse(
                 platform.apiValue(),
@@ -138,7 +135,7 @@ public class OverviewQueryService {
                         .map(point -> new OverviewTrendPointResponse(point.timestamp(), point.messageCount()))
                         .toList(),
                 buildIntegration(platform, context, status),
-                buildAttentionItems(platform, context, status, now)
+                platformStatusResolver.buildAttentionItems(platform, context, status, now)
         );
     }
 
@@ -183,77 +180,6 @@ public class OverviewQueryService {
         );
     }
 
-    private List<PlatformAttentionItemResponse> buildAttentionItems(
-            OverviewPlatform platform,
-            PlatformContext context,
-            String status,
-            Instant now
-    ) {
-        List<PlatformAttentionItemResponse> items = new ArrayList<>();
-
-        if ("inactive".equals(status)) {
-            items.add(new PlatformAttentionItemResponse("idle", "Платформа пока не настроена или неактивна."));
-            return items;
-        }
-
-        if (context.lastEventAt() != null && context.lastEventAt().isBefore(now.minus(Duration.ofHours(6)))) {
-            items.add(new PlatformAttentionItemResponse("warning", "Нет новых событий более 6 часов."));
-        }
-
-        if (platform == OverviewPlatform.TELEGRAM && context.telegramSession() != null) {
-            if (context.telegramSession().getSessionState() == TelegramUserSessionState.WAIT_PASSWORD) {
-                items.add(new PlatformAttentionItemResponse("warning", "Сессия Telegram ожидает пароль."));
-            }
-            if (context.telegramSession().getSessionState() == TelegramUserSessionState.FAILED) {
-                items.add(new PlatformAttentionItemResponse("critical", "Сессия Telegram завершилась ошибкой."));
-            }
-        }
-
-        if (platform == OverviewPlatform.VK && context.vkGroupCount() == 0) {
-            items.add(new PlatformAttentionItemResponse("warning", "Нет подключённых VK-групп для сбора."));
-        }
-
-        if (context.hasSourceError()) {
-            items.add(new PlatformAttentionItemResponse("critical", "Есть источники в состоянии ошибки."));
-        }
-
-        if (items.isEmpty()) {
-            items.add(new PlatformAttentionItemResponse("healthy", "Критичных сигналов не обнаружено."));
-        }
-
-        return items;
-    }
-
-    private String resolveStatus(OverviewPlatform platform, PlatformContext context, Instant now) {
-        if (context.sourceCount() == 0 && context.messageCount() == 0) {
-            return "inactive";
-        }
-
-        if (platform == OverviewPlatform.TELEGRAM && context.telegramSession() != null) {
-            if (context.telegramSession().getSessionState() == TelegramUserSessionState.FAILED) {
-                return "critical";
-            }
-            if (context.telegramSession().getSessionState() == TelegramUserSessionState.WAIT_PASSWORD
-                    || context.telegramSession().getSessionState() == TelegramUserSessionState.WAIT_CODE) {
-                return "warning";
-            }
-        }
-
-        if (context.hasSourceError()) {
-            return "critical";
-        }
-
-        if (context.lastEventAt() != null && context.lastEventAt().isBefore(now.minus(Duration.ofHours(6)))) {
-            return "warning";
-        }
-
-        if (context.allSourcesInactive() && context.messageCount() == 0) {
-            return "inactive";
-        }
-
-        return "healthy";
-    }
-
     private Instant latestSourceUpdate(List<IntegrationSource> sources) {
         return sources.stream()
                 .map(IntegrationSource::getUpdatedAt)
@@ -283,20 +209,5 @@ public class OverviewQueryService {
             case FAILED -> "Требуется восстановление сессии";
             case WAIT_PHONE -> "Ожидается номер телефона";
         };
-    }
-
-    private record PlatformContext(
-            long messageCount,
-            long conversationCount,
-            long activeAuthorCount,
-            Instant lastEventAt,
-            long sourceCount,
-            boolean hasSourceError,
-            boolean allSourcesInactive,
-            Instant lastSuccessAt,
-            String lastErrorMessage,
-            TelegramUserSession telegramSession,
-            long vkGroupCount
-    ) {
     }
 }

@@ -31,11 +31,13 @@ class OverviewQueryServiceTest {
     void getOverview_buildsSummaryAndPlatformStatuses() {
         Instant now = Instant.parse("2026-04-10T10:15:00Z");
 
+        PlatformStatusResolver statusResolver = new PlatformStatusResolver();
         OverviewQueryService service = new OverviewQueryService(
                 overviewMetricsRepository(),
                 integrationSourceRepository(),
                 telegramUserSessionRepository(),
-                vkGroupCandidateRepository()
+                vkGroupCandidateRepository(),
+                statusResolver
         );
 
         OverviewResponse response = service.getOverview(OverviewWindow.HOURS_24, now);
