@@ -467,10 +467,18 @@ jobs:
           fi
 
           frontend_healthcheck_url="${FRONTEND_HEALTHCHECK_URL:-http://127.0.0.1:${frontend_port}/}"
-          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://127.0.0.1:${frontend_port}/actuator/health}"
+          backend_healthcheck_url="${BACKEND_HEALTHCHECK_URL:-http://app:8080/actuator/health}"
 
-          for _ in $(seq 1 24); do
-            if curl -fsS "$frontend_healthcheck_url" >/dev/null && curl -fsS "$backend_healthcheck_url" >/dev/null; then
+          frontend_ready() {
+            curl -fsS "$frontend_healthcheck_url" >/dev/null
+          }
+
+          backend_ready() {
+            "${compose_cmd[@]}" exec -T frontend wget -qO- "$backend_healthcheck_url" >/dev/null
+          }
+
+          for _ in $(seq 1 36); do
+            if frontend_ready && backend_ready; then
               exit 0
             fi
 
@@ -479,6 +487,7 @@ jobs:
 
           echo "Health check failed" >&2
           echo "Frontend URL: $frontend_healthcheck_url" >&2
-          echo "Backend URL: $backend_healthcheck_url" >&2
+          echo "Backend URL (from frontend container): $backend_healthcheck_url" >&2
           "${compose_cmd[@]}" ps >&2
+          "${compose_cmd[@]}" logs --tail=120 app frontend >&2 || true
           exit 1
