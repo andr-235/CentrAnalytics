@@ -62,9 +62,7 @@ public class MessagePersistenceService {
         List<MessageAttachment> existingAttachments = messageAttachmentRepository.findByMessageId(message.getId());
 
         if (newAttachments == null || newAttachments.isEmpty()) {
-            if (!existingAttachments.isEmpty()) {
-                messageAttachmentRepository.deleteAll(existingAttachments);
-            }
+            deleteAllIfExists(existingAttachments);
             return;
         }
 
@@ -73,59 +71,113 @@ public class MessagePersistenceService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<String, MessageAttachment> existingByExternalId = existingAttachments.stream()
+        AttachmentIndexes indexes = buildAttachmentIndexes(existingAttachments);
+
+        processNewAttachments(message, newAttachments, indexes);
+        deleteOrphanedAttachments(existingAttachments, newAttachmentIds, indexes);
+    }
+
+    private void deleteAllIfExists(List<MessageAttachment> attachments) {
+        if (!attachments.isEmpty()) {
+            messageAttachmentRepository.deleteAll(attachments);
+        }
+    }
+
+    private AttachmentIndexes buildAttachmentIndexes(List<MessageAttachment> existingAttachments) {
+        Map<String, MessageAttachment> byExternalId = existingAttachments.stream()
                 .filter(a -> a.getExternalAttachmentId() != null)
                 .collect(Collectors.toMap(MessageAttachment::getExternalAttachmentId, a -> a));
 
-        Map<String, MessageAttachment> existingByUrl = existingAttachments.stream()
+        Map<String, MessageAttachment> byUrl = existingAttachments.stream()
                 .filter(a -> a.getUrl() != null)
                 .collect(Collectors.toMap(MessageAttachment::getUrl, a -> a, (a, b) -> a));
 
-        for (InboundAttachment newAttachment : newAttachments) {
-            String externalId = newAttachment.externalAttachmentId();
-            String url = newAttachment.url();
+        return new AttachmentIndexes(byExternalId, byUrl);
+    }
 
-            MessageAttachment existing = null;
-            if (externalId != null) {
-                existing = existingByExternalId.get(externalId);
-            }
-            if (existing == null && url != null) {
-                existing = existingByUrl.get(url);
-            }
+    private void processNewAttachments(
+            Message message,
+            List<InboundAttachment> newAttachments,
+            AttachmentIndexes indexes
+    ) {
+        for (InboundAttachment newAttachment : newAttachments) {
+            MessageAttachment existing = findExistingAttachment(newAttachment, indexes);
 
             if (existing != null) {
-                existing.setAttachmentType(newAttachment.attachmentType());
-                existing.setUrl(url);
-                existing.setMimeType(newAttachment.mimeType());
-                existing.setMetadataJson(newAttachment.metadataJson());
-                messageAttachmentRepository.save(existing);
-
-                wappiAttachmentContentService.buildContent(existing, newAttachment)
-                        .ifPresent(messageAttachmentContentRepository::save);
+                updateExistingAttachment(existing, newAttachment);
             } else {
-                MessageAttachment newAttachmentEntity = toAttachment(message, newAttachment);
-                MessageAttachment savedAttachment = messageAttachmentRepository.save(newAttachmentEntity);
-
-                wappiAttachmentContentService.buildContent(savedAttachment, newAttachment)
-                        .ifPresent(messageAttachmentContentRepository::save);
+                createNewAttachment(message, newAttachment);
             }
         }
+    }
 
+    private MessageAttachment findExistingAttachment(InboundAttachment attachment, AttachmentIndexes indexes) {
+        String externalId = attachment.externalAttachmentId();
+        String url = attachment.url();
+
+        if (externalId != null && indexes.byExternalId().containsKey(externalId)) {
+            return indexes.byExternalId().get(externalId);
+        }
+        if (url != null && indexes.byUrl().containsKey(url)) {
+            return indexes.byUrl().get(url);
+        }
+        return null;
+    }
+
+    private void updateExistingAttachment(MessageAttachment existing, InboundAttachment newAttachment) {
+        existing.setAttachmentType(newAttachment.attachmentType());
+        existing.setUrl(newAttachment.url());
+        existing.setMimeType(newAttachment.mimeType());
+        existing.setMetadataJson(newAttachment.metadataJson());
+        messageAttachmentRepository.save(existing);
+
+        wappiAttachmentContentService.buildContent(existing, newAttachment)
+                .ifPresent(messageAttachmentContentRepository::save);
+    }
+
+    private void createNewAttachment(Message message, InboundAttachment attachment) {
+        MessageAttachment newAttachmentEntity = toAttachment(message, attachment);
+        MessageAttachment savedAttachment = messageAttachmentRepository.save(newAttachmentEntity);
+
+        wappiAttachmentContentService.buildContent(savedAttachment, attachment)
+                .ifPresent(messageAttachmentContentRepository::save);
+    }
+
+    private void deleteOrphanedAttachments(
+            List<MessageAttachment> existingAttachments,
+            Set<String> newAttachmentIds,
+            AttachmentIndexes indexes
+    ) {
         List<MessageAttachment> orphanedAttachments = existingAttachments.stream()
-                .filter(a -> {
-                    if (a.getExternalAttachmentId() != null) {
-                        return !newAttachmentIds.contains(a.getExternalAttachmentId());
-                    }
-                    if (a.getUrl() != null) {
-                        return newAttachments.stream().noneMatch(n -> a.getUrl().equals(n.url()));
-                    }
-                    return true;
-                })
+                .filter(a -> isOrphaned(a, newAttachmentIds, indexes))
                 .toList();
 
         if (!orphanedAttachments.isEmpty()) {
             messageAttachmentRepository.deleteAll(orphanedAttachments);
         }
+    }
+
+    private boolean isOrphaned(
+            MessageAttachment attachment,
+            Set<String> newAttachmentIds,
+            AttachmentIndexes indexes
+    ) {
+        String externalId = attachment.getExternalAttachmentId();
+        String url = attachment.getUrl();
+
+        if (externalId != null) {
+            return !newAttachmentIds.contains(externalId);
+        }
+        if (url != null) {
+            return indexes.byUrl().keySet().stream().noneMatch(u -> u.equals(url));
+        }
+        return true;
+    }
+
+    private record AttachmentIndexes(
+            Map<String, MessageAttachment> byExternalId,
+            Map<String, MessageAttachment> byUrl
+    ) {
     }
 
     private void validate(InboundMessage inboundMessage) {
