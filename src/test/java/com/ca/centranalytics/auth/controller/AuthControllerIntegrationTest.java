@@ -15,6 +15,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+        "app.cors.allowed-origins=http://localhost:5173",
+        "app.cors.allowed-methods=GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        "app.cors.allowed-headers=*",
+        "app.cors.exposed-headers=Authorization",
+        "app.cors.allow-credentials=true"
+})
 @Transactional
 class AuthControllerIntegrationTest {
 
