@@ -17,14 +17,10 @@ import com.vk.api.sdk.objects.database.City;
 import com.vk.api.sdk.objects.database.Region;
 import com.vk.api.sdk.objects.database.responses.GetCitiesResponse;
 import com.vk.api.sdk.objects.database.responses.GetRegionsResponse;
-import com.vk.api.sdk.objects.groups.GroupFull;
 import com.vk.api.sdk.objects.groups.SearchType;
 import com.vk.api.sdk.objects.groups.responses.SearchResponse;
 import com.vk.api.sdk.objects.users.Fields;
-import com.vk.api.sdk.objects.users.UserFull;
 import com.vk.api.sdk.objects.users.responses.GetResponse;
-import com.vk.api.sdk.objects.wall.WallComment;
-import com.vk.api.sdk.objects.wall.WallItem;
 import com.vk.api.sdk.objects.wall.responses.GetCommentsResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,6 +46,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
 
     private final VkProperties vkProperties;
     private final VkApiClient vkApiClient;
+    private final VkOfficialResponseMapper responseMapper;
 
     @Autowired
     public HttpVkOfficialClient(VkProperties vkProperties) {
@@ -57,12 +54,17 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     }
 
     public static HttpVkOfficialClient withVkApiClient(VkProperties vkProperties, VkApiClient vkApiClient) {
-        return new HttpVkOfficialClient(vkProperties, vkApiClient);
+        return new HttpVkOfficialClient(vkProperties, vkApiClient, new VkOfficialResponseMapper(vkApiClient));
     }
 
     HttpVkOfficialClient(VkProperties vkProperties, VkApiClient vkApiClient) {
+        this(vkProperties, vkApiClient, new VkOfficialResponseMapper(vkApiClient));
+    }
+
+    HttpVkOfficialClient(VkProperties vkProperties, VkApiClient vkApiClient, VkOfficialResponseMapper responseMapper) {
         this.vkProperties = vkProperties;
         this.vkApiClient = vkApiClient;
+        this.responseMapper = responseMapper;
     }
 
     @Override
@@ -128,7 +130,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 .execute());
 
         return response.getItems().stream()
-                .map(this::toGroupResult)
+                .map(responseMapper::toGroupResult)
                 .toList();
     }
 
@@ -150,7 +152,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
         com.vk.api.sdk.objects.users.responses.SearchResponse response = execute(query::execute);
 
         return response.getItems().stream()
-                .map(this::toUserResult)
+                .map(responseMapper::toUserResult)
                 .toList();
     }
 
@@ -163,7 +165,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 .execute());
 
         return response.getItems().stream()
-                .map(this::toWallPostResult)
+                .map(responseMapper::toWallPostResult)
                 .toList();
     }
 
@@ -178,7 +180,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 .execute());
 
         return response.getItems().stream()
-                .map(this::toCommentResult)
+                .map(responseMapper::toCommentResult)
                 .toList();
     }
 
@@ -195,74 +197,8 @@ public class HttpVkOfficialClient implements VkOfficialClient {
                 .execute());
 
         return response.stream()
-                .map(this::toUserResult)
+                .map(responseMapper::toUserResult)
                 .toList();
-    }
-
-    private VkGroupSearchResult toGroupResult(GroupFull group) {
-        return new VkGroupSearchResult(
-                group.getId(),
-                group.getName(),
-                group.getScreenName(),
-                group.getDescription(),
-                group.getCity() != null ? group.getCity().getTitle() : null,
-                vkApiClient.getGson().toJson(group)
-        );
-    }
-
-    private VkUserSearchResult toUserResult(UserFull user) {
-        long userId = user.getId();
-        String screenName = firstNonBlank(user.getScreenName(), user.getDomain());
-        String profileUrl = "https://vk.com/" + firstNonBlank(screenName, "id" + userId);
-        String displayName = firstNonBlank(user.getNickname(), joinNonBlank(user.getFirstName(), user.getLastName()));
-        String education = firstNonBlank(user.getUniversityName(), user.getFacultyName());
-
-        return new VkUserSearchResult(
-                userId,
-                displayName,
-                user.getFirstName(),
-                user.getLastName(),
-                screenName,
-                profileUrl,
-                user.getCity() != null ? user.getCity().getTitle() : null,
-                user.getHomeTown(),
-                user.getBdate(),
-                user.getSex() != null ? user.getSex().getValue() : null,
-                user.getStatus(),
-                user.getLastSeen() != null && user.getLastSeen().getTime() != null ? Instant.ofEpochSecond(user.getLastSeen().getTime()) : null,
-                user.getPhoto200() != null ? user.getPhoto200().toString() : null,
-                user.getMobilePhone(),
-                user.getHomePhone(),
-                user.getSite(),
-                user.getRelation() != null ? user.getRelation().getValue() : null,
-                education,
-                user.getCareer() != null ? vkApiClient.getGson().toJson(user.getCareer()) : null,
-                user.getCounters() != null ? vkApiClient.getGson().toJson(user.getCounters()) : null,
-                vkApiClient.getGson().toJson(user)
-        );
-    }
-
-    private VkWallPostResult toWallPostResult(WallItem item) {
-        return new VkWallPostResult(
-                item.getOwnerId(),
-                Long.valueOf(item.getId()),
-                positiveOrNull(item.getFromId()),
-                item.getText(),
-                parseUnixTimestamp(item.getDate()),
-                vkApiClient.getGson().toJson(item)
-        );
-    }
-
-    private VkCommentResult toCommentResult(WallComment comment) {
-        return new VkCommentResult(
-                comment.getOwnerId(),
-                comment.getPostId().longValue(),
-                comment.getId().longValue(),
-                positiveOrNull(comment.getFromId()),
-                comment.getText(),
-                parseUnixTimestamp(comment.getDate()),
-                vkApiClient.getGson().toJson(comment)
-        );
     }
 
     private UserActor userActorForOfficialCalls() {
