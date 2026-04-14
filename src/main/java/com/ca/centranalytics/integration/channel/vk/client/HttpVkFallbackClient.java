@@ -24,16 +24,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class HttpVkFallbackClient implements VkFallbackClient {
-
-    private static final Pattern SINGLE_QUOTED_STRING = Pattern.compile("'((?:\\\\.|[^'\\\\])*)'");
-    private static final Pattern TRAILING_COMMA = Pattern.compile(",(?=\\s*[}\\]])");
-    private static final Pattern UNDEFINED_LITERAL = Pattern.compile("(?<![\\w$])undefined(?![\\w$])");
-    private static final Pattern BARE_OBJECT_KEY = Pattern.compile("(^|[\\{,]\\s*)([A-Za-z_$][\\w$]*)(\\s*:)", Pattern.MULTILINE);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -703,10 +696,10 @@ public class HttpVkFallbackClient implements VkFallbackClient {
             candidates.add(scriptData.trim());
             return candidates;
         }
-        String inlineObject = extractInlineJsonObject(scriptData);
+        String inlineObject = JsJsonExtractor.extractInlineJsonObject(scriptData);
         if (StringUtils.hasText(inlineObject)) {
             candidates.add(inlineObject);
-            String normalized = normalizeJsLikeObject(inlineObject);
+            String normalized = JsJsonExtractor.normalizeJsObject(inlineObject);
             if (StringUtils.hasText(normalized) && !normalized.equals(inlineObject)) {
                 candidates.add(normalized);
             }
@@ -736,14 +729,14 @@ public class HttpVkFallbackClient implements VkFallbackClient {
         if (looksLikeJson(value)) {
             candidates.add(value);
         }
-        String normalized = normalizeJsLikeObject(value);
+        String normalized = JsJsonExtractor.normalizeJsObject(value);
         if (StringUtils.hasText(normalized) && !normalized.equals(value) && looksLikeJson(normalized)) {
             candidates.add(normalized);
         }
-        String inlineObject = extractInlineJsonObject(value);
+        String inlineObject = JsJsonExtractor.extractInlineJsonObject(value);
         if (StringUtils.hasText(inlineObject)) {
             candidates.add(inlineObject);
-            String normalizedInline = normalizeJsLikeObject(inlineObject);
+            String normalizedInline = JsJsonExtractor.normalizeJsObject(inlineObject);
             if (StringUtils.hasText(normalizedInline) && !normalizedInline.equals(inlineObject)) {
                 candidates.add(normalizedInline);
             }
@@ -760,151 +753,7 @@ public class HttpVkFallbackClient implements VkFallbackClient {
     }
 
     private String normalizeJsLikeObject(String payload) {
-        if (!StringUtils.hasText(payload)) {
-            return payload;
-        }
-        String normalized = stripJsComments(payload);
-        normalized = UNDEFINED_LITERAL.matcher(normalized).replaceAll("null");
-        normalized = TRAILING_COMMA.matcher(normalized).replaceAll("");
-        Matcher matcher = SINGLE_QUOTED_STRING.matcher(normalized);
-        StringBuffer buffer = new StringBuffer();
-        while (matcher.find()) {
-            String value = matcher.group(1)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            matcher.appendReplacement(buffer, Matcher.quoteReplacement("\"" + value + "\""));
-        }
-        matcher.appendTail(buffer);
-        normalized = buffer.toString();
-        return BARE_OBJECT_KEY.matcher(normalized).replaceAll("$1\"$2\"$3");
-    }
-
-    private String extractInlineJsonObject(String scriptData) {
-        int assignmentIndex = scriptData.indexOf('=');
-        int searchFrom = assignmentIndex >= 0 ? assignmentIndex + 1 : 0;
-        int objectStart = scriptData.indexOf('{', searchFrom);
-        if (objectStart < 0) {
-            return null;
-        }
-        int depth = 0;
-        boolean inString = false;
-        char stringDelimiter = 0;
-        boolean escaped = false;
-        boolean inLineComment = false;
-        boolean inBlockComment = false;
-        for (int i = objectStart; i < scriptData.length(); i++) {
-            char current = scriptData.charAt(i);
-            char next = i + 1 < scriptData.length() ? scriptData.charAt(i + 1) : 0;
-            if (inLineComment) {
-                if (current == '\n' || current == '\r') {
-                    inLineComment = false;
-                }
-                continue;
-            }
-            if (inBlockComment) {
-                if (current == '*' && next == '/') {
-                    inBlockComment = false;
-                    i++;
-                }
-                continue;
-            }
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (current == '\\') {
-                    escaped = true;
-                } else if (current == stringDelimiter) {
-                    inString = false;
-                    stringDelimiter = 0;
-                }
-                continue;
-            }
-            if (current == '/' && next == '/') {
-                inLineComment = true;
-                i++;
-                continue;
-            }
-            if (current == '/' && next == '*') {
-                inBlockComment = true;
-                i++;
-                continue;
-            }
-            if (current == '"' || current == '\'') {
-                inString = true;
-                stringDelimiter = current;
-                continue;
-            }
-            if (current == '{') {
-                depth++;
-                continue;
-            }
-            if (current != '}') {
-                continue;
-            }
-            depth--;
-            if (depth == 0) {
-                return scriptData.substring(objectStart, i + 1).trim();
-            }
-        }
-        return null;
-    }
-
-    private String stripJsComments(String value) {
-        if (!StringUtils.hasText(value)) {
-            return value;
-        }
-        StringBuilder result = new StringBuilder(value.length());
-        boolean inString = false;
-        char stringDelimiter = 0;
-        boolean escaped = false;
-        boolean inLineComment = false;
-        boolean inBlockComment = false;
-        for (int i = 0; i < value.length(); i++) {
-            char current = value.charAt(i);
-            char next = i + 1 < value.length() ? value.charAt(i + 1) : 0;
-            if (inLineComment) {
-                if (current == '\n' || current == '\r') {
-                    inLineComment = false;
-                    result.append(current);
-                }
-                continue;
-            }
-            if (inBlockComment) {
-                if (current == '*' && next == '/') {
-                    inBlockComment = false;
-                    i++;
-                }
-                continue;
-            }
-            if (inString) {
-                result.append(current);
-                if (escaped) {
-                    escaped = false;
-                } else if (current == '\\') {
-                    escaped = true;
-                } else if (current == stringDelimiter) {
-                    inString = false;
-                    stringDelimiter = 0;
-                }
-                continue;
-            }
-            if (current == '/' && next == '/') {
-                inLineComment = true;
-                i++;
-                continue;
-            }
-            if (current == '/' && next == '*') {
-                inBlockComment = true;
-                i++;
-                continue;
-            }
-            if (current == '"' || current == '\'') {
-                inString = true;
-                stringDelimiter = current;
-            }
-            result.append(current);
-        }
-        return result.toString();
+        return JsJsonExtractor.normalizeJsObject(payload);
     }
 
     private String text(Element parent, String selector) {
