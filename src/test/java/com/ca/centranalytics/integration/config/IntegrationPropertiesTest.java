@@ -1,6 +1,5 @@
 package com.ca.centranalytics.integration.config;
 
-import com.ca.centranalytics.integration.channel.telegram.user.config.TelegramUserProperties;
 import com.ca.centranalytics.integration.channel.vk.config.VkAutoCollectionProperties;
 import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
 import org.junit.jupiter.api.Test;
@@ -32,15 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.vk.auto-collection.comment-limit=20",
         "integration.vk.auto-collection.collection-mode=HYBRID",
         "integration.vk.auto-collection.fixed-delay-ms=900000",
-        "integration.telegram-user.enabled=true",
-        "integration.telegram-user.api-id=12345",
-        "integration.telegram-user.api-hash=hash-value",
-        "integration.telegram-user.database-dir=.tdlib/db",
-        "integration.telegram-user.files-dir=.tdlib/files",
-        "integration.telegram-user.system-language-code=ru",
-        "integration.telegram-user.device-model=CentrAnalytics",
-        "integration.telegram-user.system-version=server",
-        "integration.telegram-user.application-version=1.0.0",
         "integration.max.webhook-path=/api/integrations/webhooks/wappi/max"
 })
 class IntegrationPropertiesTest {
@@ -52,13 +42,10 @@ class IntegrationPropertiesTest {
     private VkAutoCollectionProperties vkAutoCollectionProperties;
 
     @Autowired
-    private TelegramUserProperties telegramUserProperties;
-
-    @Autowired
     private Environment environment;
 
     @Test
-    void bindsVkDiscoveryAndTelegramUserProperties() {
+    void bindsVkDiscoveryProperties() {
         assertThat(vkProperties.groupId()).isEqualTo(42L);
         assertThat(vkProperties.accessToken()).isEqualTo("vk-token");
         assertThat(vkProperties.userAccessToken()).isEqualTo("vk-user-token");
@@ -74,16 +61,6 @@ class IntegrationPropertiesTest {
         assertThat(vkAutoCollectionProperties.commentLimit()).isEqualTo(20);
         assertThat(vkAutoCollectionProperties.collectionMode()).isEqualTo("HYBRID");
         assertThat(vkAutoCollectionProperties.fixedDelayMs()).isEqualTo(900000L);
-
-        assertThat(telegramUserProperties.enabled()).isTrue();
-        assertThat(telegramUserProperties.apiId()).isEqualTo(12345);
-        assertThat(telegramUserProperties.apiHash()).isEqualTo("hash-value");
-        assertThat(telegramUserProperties.databaseDir()).isEqualTo(".tdlib/db");
-        assertThat(telegramUserProperties.filesDir()).isEqualTo(".tdlib/files");
-        assertThat(telegramUserProperties.systemLanguageCode()).isEqualTo("ru");
-        assertThat(telegramUserProperties.deviceModel()).isEqualTo("CentrAnalytics");
-        assertThat(telegramUserProperties.systemVersion()).isEqualTo("server");
-        assertThat(telegramUserProperties.applicationVersion()).isEqualTo("1.0.0");
     }
 
     @Test
@@ -93,7 +70,7 @@ class IntegrationPropertiesTest {
     }
 
     @Configuration
-    @EnableConfigurationProperties({VkProperties.class, VkAutoCollectionProperties.class, TelegramUserProperties.class})
+    @EnableConfigurationProperties({VkProperties.class, VkAutoCollectionProperties.class})
     static class TestConfig {
     }
 }

@@ -8,8 +8,6 @@ import com.ca.centranalytics.integration.api.dto.OverviewTrendPointResponse;
 import com.ca.centranalytics.integration.api.dto.OverviewWindow;
 import com.ca.centranalytics.integration.api.dto.PlatformIntegrationStatusResponse;
 import com.ca.centranalytics.integration.api.dto.PlatformOverviewResponse;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSession;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSessionRepository;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.domain.entity.IntegrationSource;
 import com.ca.centranalytics.integration.domain.entity.IntegrationStatus;
@@ -43,7 +41,6 @@ public class OverviewQueryService {
 
     private final OverviewMetricsRepository overviewMetricsRepository;
     private final IntegrationSourceRepository integrationSourceRepository;
-    private final TelegramUserSessionRepository telegramUserSessionRepository;
     private final VkGroupCandidateRepository vkGroupCandidateRepository;
     private final PlatformStatusResolver platformStatusResolver;
 
@@ -64,11 +61,8 @@ public class OverviewQueryService {
             }
         }
 
-        TelegramUserSession telegramSession = telegramUserSessionRepository.findFirstByOrderByUpdatedAtDesc()
-                .orElse(null);
-
         List<PlatformOverviewResponse> platforms = DISPLAY_PLATFORMS.stream()
-                .map(platform -> buildPlatformOverview(platform, metricByPlatform, sourcesByPlatform, telegramSession, from, now, window, summaryMetrics.messageCount()))
+                .map(platform -> buildPlatformOverview(platform, metricByPlatform, sourcesByPlatform, from, now, window, summaryMetrics.messageCount()))
                 .toList();
 
         long platformIssueCount = platforms.stream()
@@ -93,7 +87,6 @@ public class OverviewQueryService {
             OverviewPlatform platform,
             Map<Platform, OverviewPlatformMetrics> metricByPlatform,
             Map<Platform, List<IntegrationSource>> sourcesByPlatform,
-            TelegramUserSession telegramSession,
             Instant from,
             Instant now,
             OverviewWindow window,
@@ -120,7 +113,6 @@ public class OverviewQueryService {
                 sources.stream().allMatch(source -> source.getStatus() == IntegrationStatus.INACTIVE),
                 latestSourceUpdate(sources),
                 latestSourceError(sources),
-                platform == OverviewPlatform.TELEGRAM ? telegramSession : null,
                 platform == OverviewPlatform.VK ? vkGroupCandidateRepository.count() : 0L
         );
 
@@ -158,7 +150,11 @@ public class OverviewQueryService {
             String status
     ) {
         String detail = switch (platform) {
-            case TELEGRAM -> telegramDetail(context.telegramSession());
+            case TELEGRAM -> context.sourceCount() > 0
+                    ? "Telegram auth gateway подключен"
+                    : context.messageCount() > 0
+                        ? "Есть исторические сообщения Telegram"
+                        : "Telegram gateway не активирован";
             case VK -> context.vkGroupCount() > 0
                     ? "Группы под управлением: " + context.vkGroupCount()
                     : "Группы не настроены";
@@ -195,19 +191,5 @@ public class OverviewQueryService {
                 .findFirst()
                 .map(name -> "Ошибка источника: " + name)
                 .orElse(null);
-    }
-
-    private String telegramDetail(TelegramUserSession session) {
-        if (session == null) {
-            return "Сессия Telegram не запущена";
-        }
-
-        return switch (session.getSessionState()) {
-            case READY -> "Сессия активна";
-            case WAIT_CODE -> "Ожидается код подтверждения";
-            case WAIT_PASSWORD -> "Ожидается пароль";
-            case FAILED -> "Требуется восстановление сессии";
-            case WAIT_PHONE -> "Ожидается номер телефона";
-        };
     }
 }

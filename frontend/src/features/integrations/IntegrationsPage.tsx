@@ -257,8 +257,8 @@ export function IntegrationsPage({
               <strong>{telegramSession?.state || "NOT_STARTED"}</strong>
             </div>
             <div className="integration-metric">
-              <span>Последний sync</span>
-              <strong>{formatDateTime(telegramSession?.lastSyncAt ?? null)}</strong>
+              <span>Контур</span>
+              <strong>telegram-auth-gateway</strong>
             </div>
             <div className="integration-metric">
               <span>Аккаунт</span>
@@ -342,8 +342,7 @@ export function IntegrationsPage({
             </p>
           ) : (
             <p className="integration-note">
-              Telegram работает через user-session. После авторизации поток
-              сообщений идет в общую витрину автоматически.
+              Telegram работает только через telegram-auth-gateway. После авторизации gateway отправляет события в общую витрину автоматически.
             </p>
           )}
         </article>

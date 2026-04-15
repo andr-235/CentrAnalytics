@@ -26,7 +26,6 @@ public class TelegramUserAuthService {
                 null,
                 TelegramUserSessionState.WAIT_CODE,
                 false,
-                null,
                 null
         );
     }
@@ -43,7 +42,6 @@ public class TelegramUserAuthService {
                         null,
                         TelegramUserSessionState.WAIT_PASSWORD,
                         false,
-                        null,
                         null
                 );
             }
@@ -76,7 +74,6 @@ public class TelegramUserAuthService {
                 response.userId(),
                 TelegramUserSessionState.READY,
                 true,
-                null,
                 null
         );
     }
@@ -98,7 +95,6 @@ public class TelegramUserAuthService {
                 response.userId(),
                 TelegramUserSessionState.READY,
                 true,
-                null,
                 null
         );
     }

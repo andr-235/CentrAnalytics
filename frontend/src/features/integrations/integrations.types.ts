@@ -12,7 +12,6 @@ export type TelegramSessionRecord = {
   state: TelegramSessionState;
   authorized: boolean;
   errorMessage: string | null;
-  lastSyncAt: string | null;
 };
 
 export type VkGroupRecord = {

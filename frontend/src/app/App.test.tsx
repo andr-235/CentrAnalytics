@@ -145,8 +145,7 @@ describe("App", () => {
             telegramUserId: 10101,
             state: "WAIT_CODE",
             authorized: false,
-            errorMessage: null,
-            lastSyncAt: "2026-04-07T03:10:00Z"
+            errorMessage: null
           }),
           {
             status: 200,

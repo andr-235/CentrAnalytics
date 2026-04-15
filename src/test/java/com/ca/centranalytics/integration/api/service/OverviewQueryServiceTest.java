@@ -3,9 +3,6 @@ package com.ca.centranalytics.integration.api.service;
 import com.ca.centranalytics.integration.api.dto.OverviewPlatform;
 import com.ca.centranalytics.integration.api.dto.OverviewResponse;
 import com.ca.centranalytics.integration.api.dto.OverviewWindow;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSession;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSessionRepository;
-import com.ca.centranalytics.integration.channel.telegram.user.domain.TelegramUserSessionState;
 import com.ca.centranalytics.integration.channel.vk.repository.VkGroupCandidateRepository;
 import com.ca.centranalytics.integration.domain.entity.IntegrationSource;
 import com.ca.centranalytics.integration.domain.entity.IntegrationStatus;
@@ -21,7 +18,6 @@ import java.lang.reflect.Proxy;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,7 +31,6 @@ class OverviewQueryServiceTest {
         OverviewQueryService service = new OverviewQueryService(
                 overviewMetricsRepository(),
                 integrationSourceRepository(),
-                telegramUserSessionRepository(),
                 vkGroupCandidateRepository(),
                 statusResolver
         );
@@ -57,7 +52,7 @@ class OverviewQueryServiceTest {
                 .first()
                 .satisfies(item -> {
                     assertThat(item.status()).isEqualTo("healthy");
-                    assertThat(item.integration().detail()).isEqualTo("Сессия активна");
+                    assertThat(item.integration().detail()).isEqualTo("Telegram auth gateway подключен");
                     assertThat(item.trend()).hasSize(1);
                 });
         assertThat(response.platforms())
@@ -120,27 +115,6 @@ class OverviewQueryServiceTest {
                 (proxy, method, args) -> switch (method.getName()) {
                     case "findByPlatform" -> sources.getOrDefault((Platform) args[0], List.of());
                     case "countByPlatform" -> (long) sources.getOrDefault((Platform) args[0], List.of()).size();
-                    default -> throw new UnsupportedOperationException(method.getName());
-                }
-        );
-    }
-
-    private TelegramUserSessionRepository telegramUserSessionRepository() {
-        TelegramUserSession session = TelegramUserSession.builder()
-                .id(7L)
-                .phoneNumber("+79991234567")
-                .sessionState(TelegramUserSessionState.READY)
-                .authorized(true)
-                .lastSyncAt(Instant.parse("2026-04-10T10:05:00Z"))
-                .updatedAt(Instant.parse("2026-04-10T10:05:00Z"))
-                .build();
-
-        return (TelegramUserSessionRepository) Proxy.newProxyInstance(
-                TelegramUserSessionRepository.class.getClassLoader(),
-                new Class[]{TelegramUserSessionRepository.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "findFirstByOrderByUpdatedAtDesc", "findFirstByAuthorizedTrue" -> Optional.of(session);
-                    case "findByAuthorizedTrue" -> List.of(session);
                     default -> throw new UnsupportedOperationException(method.getName());
                 }
         );

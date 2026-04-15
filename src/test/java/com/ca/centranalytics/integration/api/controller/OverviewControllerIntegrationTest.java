@@ -18,7 +18,7 @@ class OverviewControllerIntegrationTest {
 
     @Test
     void getOverview_returnsPlatformSectionsForSelectedWindow() throws Exception {
-        OverviewQueryService service = new OverviewQueryService(null, null, null, null, null) {
+        OverviewQueryService service = new OverviewQueryService(null, null, null, null) {
             @Override
             public OverviewResponse getOverview(com.ca.centranalytics.integration.api.dto.OverviewWindow window, Instant now) {
                 return new OverviewResponse(

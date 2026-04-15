@@ -29,20 +29,6 @@ type TelegramSessionPageProps = {
   onUnauthorized?: () => void;
 };
 
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "Еще не синхронизировалось";
-  }
-
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
-}
-
 function telegramStateLabel(session: TelegramSessionRecord | null) {
   if (!session) {
     return "Сессия не запущена";
@@ -188,8 +174,8 @@ export function TelegramSessionPage({
             <strong>{telegramSession?.state || "NOT_STARTED"}</strong>
           </div>
           <div className="integration-metric">
-            <span>Последний sync</span>
-            <strong>{formatDateTime(telegramSession?.lastSyncAt ?? null)}</strong>
+            <span>Контур</span>
+            <strong>telegram-auth-gateway</strong>
           </div>
           <div className="integration-metric">
             <span>Аккаунт</span>
@@ -273,8 +259,8 @@ export function TelegramSessionPage({
           </p>
         ) : (
           <p className="integration-note">
-            Telegram работает через user-session. После авторизации поток сообщений
-            идет в общую витрину автоматически.
+            Telegram работает только через telegram-auth-gateway. После авторизации gateway
+            отправляет события в общий ingestion-контур.
           </p>
         )}
       </article>
