@@ -4,6 +4,7 @@ import { loadEnv } from "./config/env.js";
 import { FileSessionStore } from "./telegram/file-session-store.js";
 import { createTelegramClientFactory } from "./telegram/gramjs-client.js";
 import { TelegramAuthService } from "./telegram/telegram-auth.service.js";
+import { startCollectorInBackground } from "./telegram/telegram-collector-bootstrap.js";
 import {
   createGramJsCollectorRuntimeFactory,
   TelegramCollectorService
@@ -59,9 +60,6 @@ async function main(): Promise<void> {
       await collectorService.onSessionReset();
     }
   });
-  if (env.TELEGRAM_COLLECTOR_ENABLED) {
-    await collectorService.startFromCurrentSession().catch(() => undefined);
-  }
   const app = createApp({
     telegramAuthService,
     telegramCollectorService: collectorService
@@ -71,6 +69,8 @@ async function main(): Promise<void> {
     host: env.HOST,
     port: env.PORT
   });
+
+  startCollectorInBackground(env.TELEGRAM_COLLECTOR_ENABLED, collectorService);
 }
 
 main().catch((error) => {
