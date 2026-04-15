@@ -10,6 +10,10 @@ public record VkProperties(
         String accessToken,
         String apiVersion,
         String apiBaseUrl,
-        Duration requestTimeout
+        Duration requestTimeout,
+        Duration minimumRequestInterval,
+        int rateLimitRetryAttempts,
+        Duration rateLimitRetryBaseDelay,
+        Duration rateLimitRetryMaxDelay
 ) {
 }

@@ -27,11 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -40,13 +41,18 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     private static final long SDK_ACTOR_ID = 1L;
     private static final String EAO_REGION = "Еврейская автономная область";
     private static final int VK_DATABASE_PAGE_SIZE = 1000;
+    private static final int TOO_MANY_REQUESTS_ERROR_CODE = 6;
     private static final int FLOOD_CONTROL_ERROR_CODE = 9;
-    private static final int FLOOD_CONTROL_RETRY_ATTEMPTS = 3;
-    private static final long FLOOD_CONTROL_RETRY_DELAY_MS = 1_000L;
+    private static final int RATE_LIMIT_REACHED_ERROR_CODE = 29;
+    private static final Duration DEFAULT_RETRY_BASE_DELAY = Duration.ofSeconds(1);
+    private static final Duration DEFAULT_RETRY_MAX_DELAY = Duration.ofSeconds(30);
 
     private final VkProperties vkProperties;
     private final VkApiClient vkApiClient;
     private final VkOfficialResponseMapper responseMapper;
+    private final Object requestThrottleMonitor = new Object();
+
+    private long nextAllowedRequestAtMs;
 
     @Autowired
     public HttpVkOfficialClient(VkProperties vkProperties) {
@@ -255,12 +261,14 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     }
 
     private <T> T execute(VkSdkCall<T> call) {
-        for (int attempt = 1; attempt <= FLOOD_CONTROL_RETRY_ATTEMPTS; attempt++) {
+        int attempts = configuredRetryAttempts();
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            throttleBeforeRequest();
             try {
                 return call.execute();
             } catch (ApiException ex) {
-                if (isFloodControl(ex) && attempt < FLOOD_CONTROL_RETRY_ATTEMPTS) {
-                    sleepBeforeRetry(attempt);
+                if (isRateLimitError(ex) && attempt < attempts) {
+                    sleep(calculateRetryDelay(attempt), "VK retry interrupted");
                     continue;
                 }
                 throw new IllegalStateException("VK SDK call failed", ex);
@@ -271,16 +279,74 @@ public class HttpVkOfficialClient implements VkOfficialClient {
         throw new IllegalStateException("VK SDK call failed");
     }
 
-    private boolean isFloodControl(ApiException ex) {
-        return ex.getCode() != null && ex.getCode() == FLOOD_CONTROL_ERROR_CODE;
+    private void throttleBeforeRequest() {
+        long minimumIntervalMs = configuredMinimumRequestIntervalMs();
+        if (minimumIntervalMs <= 0) {
+            return;
+        }
+
+        synchronized (requestThrottleMonitor) {
+            long now = System.currentTimeMillis();
+            long waitMs = nextAllowedRequestAtMs - now;
+            if (waitMs > 0) {
+                sleep(waitMs, "VK request throttling interrupted");
+            }
+            nextAllowedRequestAtMs = System.currentTimeMillis() + minimumIntervalMs;
+        }
     }
 
-    private void sleepBeforeRetry(int attempt) {
+    private boolean isRateLimitError(ApiException ex) {
+        Integer code = ex.getCode();
+        return code != null
+                && (code == TOO_MANY_REQUESTS_ERROR_CODE
+                || code == FLOOD_CONTROL_ERROR_CODE
+                || code == RATE_LIMIT_REACHED_ERROR_CODE);
+    }
+
+    private long calculateRetryDelay(int attempt) {
+        long baseDelayMs = configuredRetryBaseDelayMs();
+        long maxDelayMs = configuredRetryMaxDelayMs();
+        long multiplier = 1L << Math.min(attempt - 1, 30);
+        long scaledDelay;
         try {
-            Thread.sleep(FLOOD_CONTROL_RETRY_DELAY_MS * attempt);
+            scaledDelay = Math.multiplyExact(baseDelayMs, multiplier);
+        } catch (ArithmeticException ex) {
+            scaledDelay = Long.MAX_VALUE;
+        }
+        return Math.min(scaledDelay, maxDelayMs);
+    }
+
+    private int configuredRetryAttempts() {
+        return Math.max(1, vkProperties.rateLimitRetryAttempts());
+    }
+
+    private long configuredMinimumRequestIntervalMs() {
+        return positiveDurationMs(vkProperties.minimumRequestInterval(), Duration.ZERO);
+    }
+
+    private long configuredRetryBaseDelayMs() {
+        return positiveDurationMs(vkProperties.rateLimitRetryBaseDelay(), DEFAULT_RETRY_BASE_DELAY);
+    }
+
+    private long configuredRetryMaxDelayMs() {
+        long maxDelayMs = positiveDurationMs(vkProperties.rateLimitRetryMaxDelay(), DEFAULT_RETRY_MAX_DELAY);
+        return Math.max(maxDelayMs, configuredRetryBaseDelayMs());
+    }
+
+    private long positiveDurationMs(Duration value, Duration fallback) {
+        Duration effective = value == null || value.isNegative() ? fallback : value;
+        return Math.max(0L, effective.toMillis());
+    }
+
+    private void sleep(long durationMs, String interruptionMessage) {
+        if (durationMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(durationMs);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("VK retry interrupted", ex);
+            throw new IllegalStateException(interruptionMessage, ex);
         }
     }
 

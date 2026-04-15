@@ -20,8 +20,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class VkUserSearchService {
 
-    private static final long USER_SEARCH_THROTTLE_MS = 1_000L;
-
     private final VkOfficialClient vkOfficialClient;
     private final VkOfficialUserCandidateMapper vkOfficialUserCandidateMapper;
     private final VkCandidatePersistenceService vkCandidatePersistenceService;
@@ -56,9 +54,6 @@ public class VkUserSearchService {
         Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
         List<VkRegionalCity> effectiveCities = regionalCities.isEmpty() ? List.of() : regionalCities;
         for (int index = 0; index < effectiveCities.size() && matchedCandidatesById.size() < limit; index++) {
-            if (index > 0) {
-                throttleUserSearch();
-            }
             VkRegionalCity regionalCity = effectiveCities.get(index);
             List<VkUserSearchResult> results = vkOfficialClient.searchUsers(regionalCity, limit);
             for (VkUserSearchResult result : results) {
@@ -94,15 +89,6 @@ public class VkUserSearchService {
         int fromIndex = batchIndex * batchSize;
         int toIndex = Math.min(fromIndex + batchSize, items.size());
         return items.subList(fromIndex, toIndex);
-    }
-
-    private void throttleUserSearch() {
-        try {
-            Thread.sleep(USER_SEARCH_THROTTLE_MS);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("VK user search interrupted", ex);
-        }
     }
 
     private void finalizeJob(Long jobId, int itemCount, int processedCount, int errorCount) {

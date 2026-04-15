@@ -5,13 +5,20 @@ import com.ca.centranalytics.integration.channel.vk.config.VkProperties;
 import com.vk.api.sdk.client.ClientResponse;
 import com.vk.api.sdk.client.TransportClient;
 import com.vk.api.sdk.client.VkApiClient;
+import com.vk.api.sdk.exceptions.ApiException;
+import com.vk.api.sdk.exceptions.ApiFloodException;
+import com.vk.api.sdk.exceptions.ApiRateLimitException;
+import com.vk.api.sdk.exceptions.ApiTooManyException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -118,17 +125,57 @@ class HttpVkOfficialClientTest {
         assertThat(transportClient.lastRequestByMethod.get("users.get")).contains("access_token=vk-token");
     }
 
+    @Test
+    void retriesOnVkRateLimitErrors() {
+        ScriptedTransportClient transportClient = new ScriptedTransportClient();
+        transportClient.enqueueFailure("groups.search", new ApiTooManyException());
+        transportClient.enqueueFailure("groups.search", new ApiFloodException());
+        transportClient.enqueueFailure("groups.search", new ApiRateLimitException());
+        HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
+                properties("vk-token", null),
+                new VkApiClient(transportClient)
+        );
+
+        var results = client.searchGroups("Primorsky Krai", 25);
+
+        assertThat(results).hasSize(1);
+        assertThat(transportClient.requestCount("groups.search")).isEqualTo(4);
+    }
+
+    @Test
+    void enforcesMinimumIntervalBetweenOfficialCalls() {
+        TimingTransportClient transportClient = new TimingTransportClient();
+        HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
+                throttledProperties("vk-token", null, Duration.ofMillis(200)),
+                new VkApiClient(transportClient)
+        );
+
+        client.searchGroups("Primorsky Krai", 25);
+        client.getGroupPosts("club1001", 5);
+
+        assertThat(transportClient.recordedAt("wall.get"))
+                .isAfterOrEqualTo(transportClient.recordedAt("groups.search").plusMillis(180));
+    }
+
     private VkProperties properties(String accessToken, String apiBaseUrl) {
+        return throttledProperties(accessToken, apiBaseUrl, Duration.ZERO);
+    }
+
+    private VkProperties throttledProperties(String accessToken, String apiBaseUrl, Duration minimumInterval) {
         return new VkProperties(
                 42L,
                 accessToken,
                 "5.199",
                 apiBaseUrl,
-                Duration.ofSeconds(5)
+                Duration.ofSeconds(5),
+                minimumInterval,
+                4,
+                Duration.ofMillis(50),
+                Duration.ofMillis(200)
         );
     }
 
-    static final class RecordingTransportClient implements TransportClient {
+    static class RecordingTransportClient implements TransportClient {
 
         private final Map<String, String> lastUrlByMethod = new HashMap<>();
         private final Map<String, String> lastRequestByMethod = new HashMap<>();
@@ -220,18 +267,64 @@ class HttpVkOfficialClientTest {
             };
         }
 
-        private ClientResponse record(String url, String body) {
+        protected ClientResponse record(String url, String body) {
             String methodName = methodName(url);
             lastUrlByMethod.put(methodName, url);
             lastRequestByMethod.put(methodName, body == null ? url : url + "?" + body);
             return new ClientResponse(200, payload(methodName), Map.of("Content-Type", "application/json"));
         }
 
-        private String methodName(String url) {
+        protected String methodName(String url) {
             int methodIndex = url.indexOf("/method/");
             String tail = methodIndex >= 0 ? url.substring(methodIndex + "/method/".length()) : url;
             int queryIndex = tail.indexOf('?');
             return queryIndex >= 0 ? tail.substring(0, queryIndex) : tail;
+        }
+    }
+
+    static final class ScriptedTransportClient extends RecordingTransportClient {
+
+        private final Map<String, Queue<ApiException>> failuresByMethod = new HashMap<>();
+        private final Map<String, Integer> requestCountByMethod = new HashMap<>();
+
+        void enqueueFailure(String methodName, ApiException exception) {
+            failuresByMethod.computeIfAbsent(methodName, ignored -> new ArrayDeque<>()).add(exception);
+        }
+
+        int requestCount(String methodName) {
+            return requestCountByMethod.getOrDefault(methodName, 0);
+        }
+
+        @Override
+        protected ClientResponse record(String url, String body) {
+            String methodName = methodName(url);
+            requestCountByMethod.merge(methodName, 1, Integer::sum);
+            Queue<ApiException> failures = failuresByMethod.get(methodName);
+            if (failures != null && !failures.isEmpty()) {
+                sneakyThrow(failures.remove());
+            }
+            return super.record(url, body);
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <E extends Throwable> void sneakyThrow(Throwable throwable) throws E {
+            throw (E) throwable;
+        }
+    }
+
+    static final class TimingTransportClient extends RecordingTransportClient {
+
+        private final Map<String, Instant> recordedAtByMethod = new HashMap<>();
+
+        Instant recordedAt(String methodName) {
+            return recordedAtByMethod.get(methodName);
+        }
+
+        @Override
+        protected ClientResponse record(String url, String body) {
+            String methodName = methodName(url);
+            recordedAtByMethod.put(methodName, Instant.now());
+            return super.record(url, body);
         }
     }
 }

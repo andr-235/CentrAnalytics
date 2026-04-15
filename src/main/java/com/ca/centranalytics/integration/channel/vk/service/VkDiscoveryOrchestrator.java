@@ -37,7 +37,6 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class VkDiscoveryOrchestrator {
-    private static final long USER_SEARCH_THROTTLE_MS = 1_000L;
     private static final int REGIONAL_SEARCH_BATCH_SIZE = 3;
 
     private final VkOfficialClient vkOfficialClient;
@@ -284,9 +283,6 @@ public class VkDiscoveryOrchestrator {
         Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
         List<VkRegionalCity> effectiveCities = regionalCities.isEmpty() ? List.of() : regionalCities;
         for (int index = 0; index < effectiveCities.size() && matchedCandidatesById.size() < limit; index++) {
-            if (index > 0) {
-                throttleUserSearch();
-            }
             VkRegionalCity regionalCity = effectiveCities.get(index);
             List<VkUserSearchResult> results = vkOfficialClient.searchUsers(regionalCity, limit);
             for (VkUserSearchResult result : results) {
@@ -325,15 +321,6 @@ public class VkDiscoveryOrchestrator {
         int fromIndex = batchIndex * REGIONAL_SEARCH_BATCH_SIZE;
         int toIndex = Math.min(fromIndex + REGIONAL_SEARCH_BATCH_SIZE, items.size());
         return items.subList(fromIndex, toIndex);
-    }
-
-    private void throttleUserSearch() {
-        try {
-            Thread.sleep(USER_SEARCH_THROTTLE_MS);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("VK user search interrupted", ex);
-        }
     }
 
     private record GroupSearchHit(String searchTerm, VkGroupSearchResult result) {

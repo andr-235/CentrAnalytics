@@ -21,6 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         "integration.vk.api-version=5.199",
         "integration.vk.api-base-url=https://api.vk.com/method",
         "integration.vk.request-timeout=5s",
+        "integration.vk.minimum-request-interval=1s",
+        "integration.vk.rate-limit-retry-attempts=5",
+        "integration.vk.rate-limit-retry-base-delay=2s",
+        "integration.vk.rate-limit-retry-max-delay=30s",
         "integration.vk.auto-collection.enabled=true",
         "integration.vk.auto-collection.region=Primorsky Krai",
         "integration.vk.auto-collection.group-search-limit=25",
@@ -48,6 +52,10 @@ class IntegrationPropertiesTest {
         assertThat(vkProperties.apiVersion()).isEqualTo("5.199");
         assertThat(vkProperties.apiBaseUrl()).isEqualTo("https://api.vk.com/method");
         assertThat(vkProperties.requestTimeout()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(vkProperties.minimumRequestInterval()).isEqualTo(Duration.ofSeconds(1));
+        assertThat(vkProperties.rateLimitRetryAttempts()).isEqualTo(5);
+        assertThat(vkProperties.rateLimitRetryBaseDelay()).isEqualTo(Duration.ofSeconds(2));
+        assertThat(vkProperties.rateLimitRetryMaxDelay()).isEqualTo(Duration.ofSeconds(30));
         assertThat(vkAutoCollectionProperties.enabled()).isTrue();
         assertThat(vkAutoCollectionProperties.region()).isEqualTo("Primorsky Krai");
         assertThat(vkAutoCollectionProperties.groupSearchLimit()).isEqualTo(25);
