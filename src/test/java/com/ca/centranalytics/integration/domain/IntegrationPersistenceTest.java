@@ -284,7 +284,7 @@ class IntegrationPersistenceTest {
                         "Ivan Ivanov",
                         "https://vk.com/id2002",
                         "TEXT",
-                        "FALLBACK",
+                        "OFFICIAL_API",
                         "{\"id\":2002,\"first_name\":\"Ivan\",\"last_name\":\"Ivanov\"}",
                         timestamp,
                         timestamp);
@@ -366,7 +366,7 @@ class IntegrationPersistenceTest {
                     "primorye_group_dup",
                     "Primorye Group Duplicate",
                     "TEXT",
-                    "FALLBACK",
+                    "OFFICIAL_API",
                     "{\"id\":1001,\"name\":\"Primorye Group Duplicate\"}",
                     timestamp,
                     timestamp)))
@@ -410,7 +410,7 @@ class IntegrationPersistenceTest {
                     3003L,
                     2002L,
                     "Hello from Primorye duplicate",
-                    "FALLBACK",
+                    "OFFICIAL_API",
                     "{\"owner_id\":-1001,\"id\":3003}",
                     timestamp,
                     timestamp)))
@@ -434,7 +434,7 @@ class IntegrationPersistenceTest {
                     4004L,
                     2002L,
                     "Great post duplicate",
-                    "FALLBACK",
+                    "OFFICIAL_API",
                     "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}",
                     timestamp,
                     timestamp)))
@@ -489,7 +489,7 @@ class IntegrationPersistenceTest {
                 .careerJson("{\"company\":\"CA\"}")
                 .countersJson("{\"friends\":120}")
                 .regionMatchSource(VkMatchSource.TEXT)
-                .collectionMethod(VkCollectionMethod.FALLBACK)
+                .collectionMethod(VkCollectionMethod.OFFICIAL_API)
                 .rawJson("{\"id\":2002}")
                 .build());
 

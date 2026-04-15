@@ -1,7 +1,6 @@
 package com.ca.centranalytics.integration.channel.vk.service;
 
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
-import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkRegionalCity;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkUserSearchResult;
@@ -17,12 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Сервис для поиска VK-пользователей по региону.
- * <p>
- * Выполняет поиск пользователей через official API с fallback на парсинг.
- * Включает throttling для предотвращения flood control.
- */
 @Service
 @RequiredArgsConstructor
 public class VkUserSearchService {
@@ -30,32 +23,16 @@ public class VkUserSearchService {
     private static final long USER_SEARCH_THROTTLE_MS = 1_000L;
 
     private final VkOfficialClient vkOfficialClient;
-    private final VkFallbackClient vkFallbackClient;
     private final VkOfficialUserCandidateMapper vkOfficialUserCandidateMapper;
     private final VkCandidatePersistenceService vkCandidatePersistenceService;
-    private final VkFallbackPolicy vkFallbackPolicy;
     private final VkCrawlJobService vkCrawlJobService;
 
-    /**
-     * Запускает поиск пользователей в указанном регионе.
-     *
-     * @param job     задача VK crawling
-     * @param request параметры поиска
-     */
     public void runUserSearch(VkCrawlJob job, SearchVkUsersRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
         try {
             List<VkRegionalCity> regionalCities = vkOfficialClient.resolveRegionalCities(request.region());
             List<VkRegionalCity> cityBatch = selectUserSearchCityBatch(job, regionalCities);
-            Map<Long, VkUserCandidate> matchedCandidatesById = collectUserCandidates(cityBatch, request.limit(), false);
-            VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
-            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), matchedCandidatesById.isEmpty(), false)) {
-                Map<Long, VkUserCandidate> fallbackCandidates = collectFallbackUserCandidates(cityBatch, request.limit());
-                if (!fallbackCandidates.isEmpty()) {
-                    matchedCandidatesById = fallbackCandidates;
-                    method = VkCollectionMethod.FALLBACK;
-                }
-            }
+            Map<Long, VkUserCandidate> matchedCandidatesById = collectUserCandidates(cityBatch, request.limit());
 
             List<VkUserCandidate> matchedCandidates = matchedCandidatesById.values().stream()
                     .limit(request.limit())
@@ -75,22 +52,20 @@ public class VkUserSearchService {
         }
     }
 
-    private Map<Long, VkUserCandidate> collectUserCandidates(List<VkRegionalCity> regionalCities, int limit, boolean useFallback) {
+    private Map<Long, VkUserCandidate> collectUserCandidates(List<VkRegionalCity> regionalCities, int limit) {
         Map<Long, VkUserCandidate> matchedCandidatesById = new LinkedHashMap<>();
         List<VkRegionalCity> effectiveCities = regionalCities.isEmpty() ? List.of() : regionalCities;
         for (int index = 0; index < effectiveCities.size() && matchedCandidatesById.size() < limit; index++) {
-            if (!useFallback && index > 0) {
+            if (index > 0) {
                 throttleUserSearch();
             }
             VkRegionalCity regionalCity = effectiveCities.get(index);
-            List<VkUserSearchResult> results = useFallback
-                    ? vkFallbackClient.searchUsers(regionalCity.title(), limit)
-                    : vkOfficialClient.searchUsers(regionalCity, limit);
+            List<VkUserSearchResult> results = vkOfficialClient.searchUsers(regionalCity, limit);
             for (VkUserSearchResult result : results) {
                 VkUserCandidate candidate = vkOfficialUserCandidateMapper.map(
                         regionalCity.title(),
                         result,
-                        useFallback ? VkCollectionMethod.FALLBACK : VkCollectionMethod.OFFICIAL_API
+                        VkCollectionMethod.OFFICIAL_API
                 );
                 if (candidate.getRegionMatchSource() != VkMatchSource.FALLBACK) {
                     matchedCandidatesById.putIfAbsent(candidate.getVkUserId(), candidate);
@@ -101,10 +76,6 @@ public class VkUserSearchService {
             }
         }
         return matchedCandidatesById;
-    }
-
-    private Map<Long, VkUserCandidate> collectFallbackUserCandidates(List<VkRegionalCity> regionalCities, int limit) {
-        return collectUserCandidates(regionalCities, limit, true);
     }
 
     private List<VkRegionalCity> selectUserSearchCityBatch(VkCrawlJob job, List<VkRegionalCity> regionalCities) {

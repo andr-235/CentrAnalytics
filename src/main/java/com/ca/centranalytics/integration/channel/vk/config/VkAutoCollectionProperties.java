@@ -10,7 +10,6 @@ public record VkAutoCollectionProperties(
         int postLimit,
         int commentPostLimit,
         int commentLimit,
-        String collectionMode,
         long fixedDelayMs
 ) {
 }

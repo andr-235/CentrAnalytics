@@ -32,7 +32,7 @@ class VkAutoCollectionServiceTest {
     void runsGroupDiscoveryWhileCollectingPostsAndCommentsForRegionalGroups() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(
@@ -44,19 +44,19 @@ class VkAutoCollectionServiceTest {
         service.collect();
 
         assertThat(vkCrawlCommandService.searchRequests)
-                .containsExactly(new SearchVkGroupsRequest("Primorsky Krai", 25, "HYBRID"));
+                .containsExactly(new SearchVkGroupsRequest("Primorsky Krai", 25));
         assertThat(vkCrawlCommandService.userSearchRequests).isEmpty();
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10)));
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"));
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20));
     }
 
     @Test
     void skipsFallbackGroupsDuringAutoCollection() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Еврейская автономная область", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Еврейская автономная область", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(
                         VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build(),
@@ -68,9 +68,9 @@ class VkAutoCollectionServiceTest {
         service.collect();
 
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10)));
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L), 20, "HYBRID"));
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L), 20));
     }
 
     @Test
@@ -78,7 +78,7 @@ class VkAutoCollectionServiceTest {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         vkCrawlCommandService.failedGroupPostIds.add(1001L);
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
@@ -87,7 +87,7 @@ class VkAutoCollectionServiceTest {
         service.collect();
 
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10)));
         assertThat(vkCrawlCommandService.commentRequests).isEmpty();
     }
 
@@ -96,7 +96,7 @@ class VkAutoCollectionServiceTest {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         vkCrawlCommandService.groupPostExceptions.add(1001L);
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(
                         VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build(),
@@ -112,18 +112,18 @@ class VkAutoCollectionServiceTest {
 
         assertThat(vkCrawlCommandService.postRequests)
                 .containsExactly(
-                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")),
-                        new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10, "HYBRID"))
+                        new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10)),
+                        new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10))
                 );
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20, "HYBRID"));
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20));
     }
 
     @Test
     void skipsGroupsWithActivePostCollectionBlock() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(
                         VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).postCollectionBlockedUntil(Instant.now().plusSeconds(3600)).build(),
@@ -138,9 +138,9 @@ class VkAutoCollectionServiceTest {
         service.collect();
 
         assertThat(vkCrawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(new GroupPostCall(2002L, new CollectVkGroupPostsRequest(10)));
         assertThat(vkCrawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20, "HYBRID"));
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(4004L), 20));
     }
 
     @Test
@@ -151,7 +151,7 @@ class VkAutoCollectionServiceTest {
                 VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build()
         ));
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groups,
                 wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))
@@ -169,7 +169,7 @@ class VkAutoCollectionServiceTest {
     void doesNothingWhenAutoCollectionIsDisabled() {
         RecordingVkCrawlCommandService vkCrawlCommandService = new RecordingVkCrawlCommandService();
         VkAutoCollectionService service = new VkAutoCollectionService(
-                new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 vkCrawlCommandService,
                 groupRepository(List.of(VkGroupCandidate.builder().vkGroupId(1001L).regionMatchSource(VkMatchSource.TEXT).build())),
                 wallPostRepository(List.of(VkWallPostSnapshot.builder().ownerId(-1001L).postId(3003L).build()))

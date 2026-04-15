@@ -1,7 +1,6 @@
 package com.ca.centranalytics.integration.api;
 
 import com.ca.centranalytics.TestcontainersConfiguration;
-import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
@@ -399,7 +398,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"region":"Primorsky Krai","limit":25,"collectionMode":"HYBRID"}
+                                {"region":"Primorsky Krai","limit":25}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"))
@@ -409,7 +408,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/groups/{groupId}/posts/collect", 1001L)
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"limit":25,"collectionMode":"HYBRID"}
+                                {"limit":25}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("GROUP_POSTS"))
@@ -418,7 +417,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/posts/comments/collect")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"postIds":[3003],"limit":25,"collectionMode":"HYBRID"}
+                                {"postIds":[3003],"limit":25}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("POST_COMMENTS"))
@@ -427,7 +426,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/users/enrich")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"userIds":[2002],"collectionMode":"HYBRID"}
+                                {"userIds":[2002]}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("AUTHOR_PROFILE_ENRICH"))
@@ -515,7 +514,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"region":"Primorsky Krai","limit":25,"collectionMode":"HYBRID"}
+                                {"region":"Primorsky Krai","limit":25}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobType").value("GROUP_SEARCH"));
@@ -530,7 +529,7 @@ class IntegrationApiTest {
         mockMvc.perform(post("/api/admin/integrations/vk/groups/search")
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"region":"","limit":0,"collectionMode":"HYBRID"}
+                                {"region":"","limit":0}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.region").exists())
@@ -651,37 +650,6 @@ class IntegrationApiTest {
                                     "{\"id\":" + userId + "}"
                             ))
                             .toList();
-                }
-            };
-        }
-
-        @Bean
-        @Primary
-        VkFallbackClient vkFallbackClient() {
-            return new VkFallbackClient() {
-                @Override
-                public List<VkGroupSearchResult> searchGroups(String region, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> searchUsers(String region, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> getUsersByIds(List<Long> userIds) {
-                    return List.of();
                 }
             };
         }

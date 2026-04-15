@@ -32,8 +32,7 @@ public class VkGroupManagementService {
             List<String> groupIdentifiers,
             int postLimit,
             int commentPostLimit,
-            int commentLimit,
-            String collectionMode
+            int commentLimit
     ) {
         VkResolvedGroupSelection selection = vkGroupIdentifierResolver.resolve(groupIdentifiers);
         List<VkCrawlJobResponse> postJobs = new ArrayList<>();
@@ -42,7 +41,7 @@ public class VkGroupManagementService {
         for (VkGroupCandidate group : selection.resolvedGroups()) {
             postJobs.add(vkCrawlCommandService.createGroupPostsJob(
                     group.getVkGroupId(),
-                    new CollectVkGroupPostsRequest(postLimit, collectionMode)
+                    new CollectVkGroupPostsRequest(postLimit)
             ));
 
             List<Long> postIds = vkWallPostSnapshotRepository.findAllByOwnerIdOrderByUpdatedAtDesc(-Math.abs(group.getVkGroupId())).stream()
@@ -51,7 +50,7 @@ public class VkGroupManagementService {
                     .toList();
             if (!postIds.isEmpty()) {
                 commentJobs.add(vkCrawlCommandService.createPostCommentsJob(
-                        new CollectVkPostCommentsRequest(postIds, commentLimit, collectionMode)
+                        new CollectVkPostCommentsRequest(postIds, commentLimit)
                 ));
             }
         }

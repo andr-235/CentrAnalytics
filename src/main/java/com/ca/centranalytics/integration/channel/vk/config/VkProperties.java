@@ -8,10 +8,8 @@ import java.time.Duration;
 public record VkProperties(
         long groupId,
         String accessToken,
-        String userAccessToken,
         String apiVersion,
         String apiBaseUrl,
-        String fallbackBaseUrl,
         Duration requestTimeout
 ) {
 }

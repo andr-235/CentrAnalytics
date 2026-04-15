@@ -21,7 +21,7 @@ class HttpVkOfficialClientTest {
     void searchesGroupsThroughOfficialApi() {
         RecordingTransportClient transportClient = new RecordingTransportClient();
         HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
-                properties("vk-token", "vk-user-token", null),
+                properties("vk-token", null),
                 new VkApiClient(transportClient)
         );
 
@@ -41,7 +41,7 @@ class HttpVkOfficialClientTest {
     void resolvesRegionalSearchTermsForEaoFromVkDatabase() {
         RecordingTransportClient transportClient = new RecordingTransportClient();
         HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
-                properties("vk-token", "vk-user-token", null),
+                properties("vk-token", null),
                 new VkApiClient(transportClient)
         );
 
@@ -57,7 +57,7 @@ class HttpVkOfficialClientTest {
     void searchesUsersWithUserTokenAndBuildsProfileUrl() {
         RecordingTransportClient transportClient = new RecordingTransportClient();
         HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
-                properties("vk-token", "vk-user-token", null),
+                properties("vk-token", null),
                 new VkApiClient(transportClient)
         );
 
@@ -82,14 +82,14 @@ class HttpVkOfficialClientTest {
             assertThat(result.careerJson()).contains("\"company\":\"CA\"");
             assertThat(result.countersJson()).contains("\"friends\":120");
         });
-        assertThat(transportClient.lastRequestByMethod.get("users.search")).contains("access_token=vk-user-token");
+        assertThat(transportClient.lastRequestByMethod.get("users.search")).contains("access_token=vk-token");
     }
 
     @Test
     void loadsPostsCommentsAndUsersByIds() {
         RecordingTransportClient transportClient = new RecordingTransportClient();
         HttpVkOfficialClient client = HttpVkOfficialClient.withVkApiClient(
-                properties("vk-token", "", null),
+                properties("vk-token", null),
                 new VkApiClient(transportClient)
         );
 
@@ -118,14 +118,12 @@ class HttpVkOfficialClientTest {
         assertThat(transportClient.lastRequestByMethod.get("users.get")).contains("access_token=vk-token");
     }
 
-    private VkProperties properties(String accessToken, String userAccessToken, String apiBaseUrl) {
+    private VkProperties properties(String accessToken, String apiBaseUrl) {
         return new VkProperties(
                 42L,
                 accessToken,
-                userAccessToken,
                 "5.199",
                 apiBaseUrl,
-                "https://vk.com",
                 Duration.ofSeconds(5)
         );
     }

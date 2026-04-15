@@ -13,7 +13,7 @@ class VkAutoCollectionSchedulerTest {
     void skipsCollectionWhenAutoCollectionIsDisabled() {
         RecordingVkAutoCollectionService service = new RecordingVkAutoCollectionService();
         VkAutoCollectionScheduler scheduler = new VkAutoCollectionScheduler(
-                new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(false, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 service
         );
 
@@ -26,7 +26,7 @@ class VkAutoCollectionSchedulerTest {
     void delegatesToCollectionServiceWhenEnabled() {
         RecordingVkAutoCollectionService service = new RecordingVkAutoCollectionService();
         VkAutoCollectionScheduler scheduler = new VkAutoCollectionScheduler(
-                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                 service
         );
 
@@ -40,7 +40,7 @@ class VkAutoCollectionSchedulerTest {
 
         private RecordingVkAutoCollectionService() {
             super(
-                    new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, "HYBRID", 900000L),
+                    new VkAutoCollectionProperties(true, "Primorsky Krai", 25, 10, 5, 20, 900000L),
                     null,
                     null,
                     null

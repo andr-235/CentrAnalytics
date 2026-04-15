@@ -122,10 +122,10 @@ class VkOfficialMapperTest {
                 "{\"owner_id\":-1001,\"post_id\":3003,\"id\":4004}"
         );
 
-        var snapshot = commentSnapshotMapper.map(result, VkCollectionMethod.FALLBACK);
+        var snapshot = commentSnapshotMapper.map(result, VkCollectionMethod.OFFICIAL_API);
 
         assertThat(snapshot.getCommentId()).isEqualTo(4004L);
-        assertThat(snapshot.getCollectionMethod()).isEqualTo(VkCollectionMethod.FALLBACK);
+        assertThat(snapshot.getCollectionMethod()).isEqualTo(VkCollectionMethod.OFFICIAL_API);
         assertThat(snapshot.getAuthorVkUserId()).isEqualTo(2002L);
     }
 }

@@ -36,7 +36,7 @@ class VkGroupManagementServiceTest {
     void collectsPostsAndCommentsForResolvedExistingGroupsOnly() {
         Fixture fixture = new Fixture();
 
-        var response = fixture.service.collectGroups(List.of("1001", "primorye_group", "missing_group"), 10, 5, 20, "HYBRID");
+        var response = fixture.service.collectGroups(List.of("1001", "primorye_group", "missing_group"), 10, 5, 20);
 
         assertThat(response.resolvedGroups())
                 .extracting(group -> group.vkGroupId())
@@ -44,9 +44,9 @@ class VkGroupManagementServiceTest {
         assertThat(response.unresolvedIdentifiers())
                 .containsExactly("missing_group");
         assertThat(fixture.crawlCommandService.postRequests)
-                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10, "HYBRID")));
+                .containsExactly(new GroupPostCall(1001L, new CollectVkGroupPostsRequest(10)));
         assertThat(fixture.crawlCommandService.commentRequests)
-                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20, "HYBRID"));
+                .containsExactly(new CollectVkPostCommentsRequest(List.of(3003L, 3004L), 20));
     }
 
     @Test

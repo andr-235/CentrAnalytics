@@ -6,7 +6,6 @@ import com.ca.centranalytics.integration.channel.vk.api.CollectVkPostCommentsReq
 import com.ca.centranalytics.integration.channel.vk.api.EnrichVkUsersRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
-import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
@@ -23,7 +22,6 @@ import com.ca.centranalytics.integration.channel.vk.repository.VkUserCandidateRe
 import com.ca.centranalytics.integration.channel.vk.repository.VkWallPostSnapshotRepository;
 import com.ca.centranalytics.integration.channel.vk.service.VkCandidatePersistenceService;
 import com.ca.centranalytics.integration.channel.vk.service.VkDiscoveryOrchestrator;
-import com.ca.centranalytics.integration.channel.vk.service.VkFallbackPolicy;
 import com.ca.centranalytics.integration.channel.vk.service.VkOfficialGroupCandidateMapper;
 import com.ca.centranalytics.integration.channel.vk.service.VkOfficialUserCandidateMapper;
 import com.ca.centranalytics.integration.channel.vk.service.VkRegionMatcher;
@@ -111,7 +109,7 @@ class VkDiscoveryOrchestratorTest {
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runGroupSearch(job, new SearchVkGroupsRequest("Primorsky Krai", 25, "HYBRID"));
+        vkDiscoveryOrchestrator.runGroupSearch(job, new SearchVkGroupsRequest("Primorsky Krai", 25));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -121,14 +119,14 @@ class VkDiscoveryOrchestratorTest {
     }
 
     @Test
-    void fallsBackToFallbackClientWhenOfficialUserSearchReturnsNothing() {
+    void completesUserSearchWithOfficialResultsWhenOfficialClientReturnsData() {
         VkCrawlJob job = vkCrawlJobRepository.save(VkCrawlJob.builder()
                 .jobType(VkCrawlJobType.USER_SEARCH)
                 .status(VkCrawlJobStatus.CREATED)
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runUserSearch(job, new SearchVkUsersRequest("Primorsky Krai", 25, "HYBRID"));
+        vkDiscoveryOrchestrator.runUserSearch(job, new SearchVkUsersRequest("Primorsky Krai", 25));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -144,7 +142,7 @@ class VkDiscoveryOrchestratorTest {
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runGroupSearch(job, new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID"));
+        vkDiscoveryOrchestrator.runGroupSearch(job, new SearchVkGroupsRequest("Еврейская автономная область", 10));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -162,7 +160,7 @@ class VkDiscoveryOrchestratorTest {
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runUserSearch(job, new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID"));
+        vkDiscoveryOrchestrator.runUserSearch(job, new SearchVkUsersRequest("Еврейская автономная область", 10));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -180,7 +178,7 @@ class VkDiscoveryOrchestratorTest {
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runGroupPostCollection(job, 1001L, new CollectVkGroupPostsRequest(25, "HYBRID"));
+        vkDiscoveryOrchestrator.runGroupPostCollection(job, 1001L, new CollectVkGroupPostsRequest(25));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -200,7 +198,7 @@ class VkDiscoveryOrchestratorTest {
                 .status(VkCrawlJobStatus.CREATED)
                 .requestJson("{}")
                 .build());
-        vkDiscoveryOrchestrator.runGroupPostCollection(postsJob, 1001L, new CollectVkGroupPostsRequest(25, "HYBRID"));
+        vkDiscoveryOrchestrator.runGroupPostCollection(postsJob, 1001L, new CollectVkGroupPostsRequest(25));
 
         VkCrawlJob commentsJob = vkCrawlJobRepository.save(VkCrawlJob.builder()
                 .jobType(VkCrawlJobType.POST_COMMENTS)
@@ -210,7 +208,7 @@ class VkDiscoveryOrchestratorTest {
 
         vkDiscoveryOrchestrator.runPostCommentCollection(
                 commentsJob,
-                new CollectVkPostCommentsRequest(List.of(3003L), 25, "HYBRID")
+                new CollectVkPostCommentsRequest(List.of(3003L), 25)
         );
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(commentsJob.getId()).orElseThrow();
@@ -230,7 +228,7 @@ class VkDiscoveryOrchestratorTest {
                 .requestJson("{}")
                 .build());
 
-        vkDiscoveryOrchestrator.runUserEnrichment(job, new EnrichVkUsersRequest(List.of(2002L), "HYBRID"));
+        vkDiscoveryOrchestrator.runUserEnrichment(job, new EnrichVkUsersRequest(List.of(2002L)));
 
         VkCrawlJob persisted = vkCrawlJobRepository.findById(job.getId()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(VkCrawlJobStatus.COMPLETED);
@@ -478,59 +476,6 @@ class VkDiscoveryOrchestratorTest {
         }
 
         @Bean
-        @Primary
-        VkFallbackClient vkFallbackClient() {
-            return new VkFallbackClient() {
-                @Override
-                public List<VkGroupSearchResult> searchGroups(String region, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> searchUsers(String region, int limit) {
-                    return List.of(new VkUserSearchResult(
-                            2002L,
-                            "Ivan Ivanov",
-                            "Ivan",
-                            "Ivanov",
-                            "id2002",
-                            "https://vk.com/id2002",
-                            "Primorsky Krai",
-                            "Vladivostok",
-                            "10.10.1990",
-                            2,
-                            "online",
-                            null,
-                            "https://vk.com/images/2002.jpg",
-                            "+79990000001",
-                            null,
-                            null,
-                            1,
-                            "FEFU",
-                            "{\"company\":\"CA\"}",
-                            "{\"friends\":120}",
-                            "{\"id\":2002}"
-                    ));
-                }
-
-                @Override
-                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> getUsersByIds(List<Long> userIds) {
-                    return List.of();
-                }
-            };
-        }
-
-        @Bean
         VkRegionMatcher vkRegionMatcher() {
             return new VkRegionMatcher();
         }
@@ -544,12 +489,6 @@ class VkDiscoveryOrchestratorTest {
         VkOfficialUserCandidateMapper vkOfficialUserCandidateMapper(VkRegionMatcher vkRegionMatcher) {
             return new VkOfficialUserCandidateMapper(vkRegionMatcher);
         }
-
-        @Bean
-        VkFallbackPolicy vkFallbackPolicy() {
-            return new VkFallbackPolicy();
-        }
-
         @Bean
         VkCandidatePersistenceService vkCandidatePersistenceService(
                 VkGroupCandidateRepository vkGroupCandidateRepository,

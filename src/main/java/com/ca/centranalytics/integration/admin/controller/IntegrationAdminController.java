@@ -72,8 +72,7 @@ public class IntegrationAdminController {
                 request.groupIdentifiers(),
                 request.resolvedPostLimit(),
                 request.resolvedCommentPostLimit(),
-                request.resolvedCommentLimit(),
-                request.resolvedCollectionMode()
+                request.resolvedCommentLimit()
         );
     }
 

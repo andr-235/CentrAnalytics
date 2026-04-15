@@ -206,7 +206,7 @@ public class HttpVkOfficialClient implements VkOfficialClient {
     }
 
     private UserActor userActorForUserCalls() {
-        return new UserActor(SDK_ACTOR_ID, userAccessToken());
+        return new UserActor(SDK_ACTOR_ID, officialAccessToken());
     }
 
     private Integer resolveRegionId(String region) {
@@ -232,10 +232,6 @@ public class HttpVkOfficialClient implements VkOfficialClient {
             throw new IllegalStateException("integration.vk.access-token is required for VK API calls");
         }
         return vkProperties.accessToken();
-    }
-
-    private String userAccessToken() {
-        return StringUtils.hasText(vkProperties.userAccessToken()) ? vkProperties.userAccessToken() : officialAccessToken();
     }
 
     private Fields[] userFields() {

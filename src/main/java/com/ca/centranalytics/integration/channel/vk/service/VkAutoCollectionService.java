@@ -48,8 +48,7 @@ public class VkAutoCollectionService {
         try {
             vkCrawlCommandService.createGroupSearchJob(new SearchVkGroupsRequest(
                     properties.region(),
-                    properties.groupSearchLimit(),
-                    properties.collectionMode()
+                    properties.groupSearchLimit()
             ));
         } catch (RuntimeException ex) {
             log.warn("VK auto-collection group search failed for region {}", properties.region(), ex);
@@ -64,8 +63,7 @@ public class VkAutoCollectionService {
             VkCrawlJobResponse groupPostsJob;
             try {
                 groupPostsJob = vkCrawlCommandService.createGroupPostsJob(groupId, new CollectVkGroupPostsRequest(
-                        properties.postLimit(),
-                        properties.collectionMode()
+                        properties.postLimit()
                 ));
             } catch (RuntimeException ex) {
                 blockPostCollection(group);
@@ -90,8 +88,7 @@ public class VkAutoCollectionService {
                 try {
                     vkCrawlCommandService.createPostCommentsJob(new CollectVkPostCommentsRequest(
                             postIds,
-                            properties.commentLimit(),
-                            properties.collectionMode()
+                            properties.commentLimit()
                     ));
                 } catch (RuntimeException ex) {
                     log.warn("VK auto-collection post comments failed for group {}", groupId, ex);

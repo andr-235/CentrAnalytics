@@ -1,7 +1,6 @@
 package com.ca.centranalytics.integration.channel.vk.service;
 
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
-import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
 import com.ca.centranalytics.integration.channel.vk.domain.VkCollectionMethod;
@@ -17,12 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Сервис для поиска VK-групп по региону.
- * <p>
- * Отвечает за выполнение задачи поиска групп через official API
- * с автоматическим fallback на парсинг при необходимости.
- */
 @Service
 @RequiredArgsConstructor
 public class VkGroupSearchService {
@@ -30,36 +23,19 @@ public class VkGroupSearchService {
     private static final int REGIONAL_SEARCH_BATCH_SIZE = 3;
 
     private final VkOfficialClient vkOfficialClient;
-    private final VkFallbackClient vkFallbackClient;
     private final VkOfficialGroupCandidateMapper vkOfficialGroupCandidateMapper;
     private final VkCandidatePersistenceService vkCandidatePersistenceService;
-    private final VkFallbackPolicy vkFallbackPolicy;
     private final VkCrawlJobService vkCrawlJobService;
 
-    /**
-     * Запускает поиск групп в указанном регионе.
-     *
-     * @param job     задача VK crawling
-     * @param request параметры поиска
-     */
     public void runGroupSearch(VkCrawlJob job, SearchVkGroupsRequest request) {
         vkCrawlJobService.update(job.getId(), current -> current.setStatus(VkCrawlJobStatus.RUNNING));
         try {
             List<String> searchTerms = selectRegionalSearchBatch(job, vkOfficialClient.resolveRegionalSearchTerms(request.region()));
-            List<GroupSearchHit> results = searchGroups(searchTerms, request.limit(), false);
-            VkCollectionMethod method = VkCollectionMethod.OFFICIAL_API;
-            if (vkFallbackPolicy.shouldFallbackForSearch(request.collectionMode(), results.isEmpty(), false)) {
-                List<GroupSearchHit> fallbackResults = searchGroups(searchTerms, request.limit(), true);
-                if (!fallbackResults.isEmpty()) {
-                    results = fallbackResults;
-                    method = VkCollectionMethod.FALLBACK;
-                }
-            }
+            List<GroupSearchHit> results = searchGroups(searchTerms, request.limit());
 
-            VkCollectionMethod finalMethod = method;
             Map<Long, VkGroupCandidate> matchedCandidatesById = new LinkedHashMap<>();
             results.stream()
-                    .map(hit -> vkOfficialGroupCandidateMapper.map(hit.searchTerm(), hit.result(), finalMethod))
+                    .map(hit -> vkOfficialGroupCandidateMapper.map(hit.searchTerm(), hit.result(), VkCollectionMethod.OFFICIAL_API))
                     .filter(candidate -> candidate.getRegionMatchSource() != VkMatchSource.FALLBACK)
                     .forEach(candidate -> matchedCandidatesById.putIfAbsent(candidate.getVkGroupId(), candidate));
             List<VkGroupCandidate> matchedCandidates = matchedCandidatesById.values().stream()
@@ -80,13 +56,10 @@ public class VkGroupSearchService {
         }
     }
 
-    private List<GroupSearchHit> searchGroups(List<String> searchTerms, int limit, boolean useFallback) {
+    private List<GroupSearchHit> searchGroups(List<String> searchTerms, int limit) {
         List<GroupSearchHit> results = new ArrayList<>();
-        List<String> effectiveTerms = searchTerms.isEmpty() ? List.of() : searchTerms;
-        for (String searchTerm : effectiveTerms) {
-            List<VkGroupSearchResult> termResults = useFallback
-                    ? vkFallbackClient.searchGroups(searchTerm, limit)
-                    : vkOfficialClient.searchGroups(searchTerm, limit);
+        for (String searchTerm : searchTerms) {
+            List<VkGroupSearchResult> termResults = vkOfficialClient.searchGroups(searchTerm, limit);
             for (VkGroupSearchResult result : termResults) {
                 results.add(new GroupSearchHit(searchTerm, result));
             }

@@ -2,7 +2,6 @@ package com.ca.centranalytics.integration.channel.vk;
 
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkGroupsRequest;
 import com.ca.centranalytics.integration.channel.vk.api.SearchVkUsersRequest;
-import com.ca.centranalytics.integration.channel.vk.client.VkFallbackClient;
 import com.ca.centranalytics.integration.channel.vk.client.VkOfficialClient;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkCommentResult;
 import com.ca.centranalytics.integration.channel.vk.client.dto.VkGroupSearchResult;
@@ -27,7 +26,6 @@ import com.ca.centranalytics.integration.channel.vk.service.VkCommentIngestionMa
 import com.ca.centranalytics.integration.channel.vk.service.VkCommentSnapshotMapper;
 import com.ca.centranalytics.integration.channel.vk.service.VkCrawlJobService;
 import com.ca.centranalytics.integration.channel.vk.service.VkDiscoveryOrchestrator;
-import com.ca.centranalytics.integration.channel.vk.service.VkFallbackPolicy;
 import com.ca.centranalytics.integration.channel.vk.service.VkOfficialGroupCandidateMapper;
 import com.ca.centranalytics.integration.channel.vk.service.VkOfficialUserCandidateMapper;
 import com.ca.centranalytics.integration.channel.vk.service.VkPostIngestionMapper;
@@ -56,7 +54,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runGroupSearch(
                 harness.job(VkCrawlJobType.GROUP_SEARCH),
-                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkGroupsRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.groupCandidates.values())
@@ -73,7 +71,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runGroupSearch(
                 harness.job(VkCrawlJobType.GROUP_SEARCH),
-                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkGroupsRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.groupCandidates.values())
@@ -91,7 +89,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runGroupSearch(
                 harness.job(1L, VkCrawlJobType.GROUP_SEARCH),
-                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkGroupsRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.searchedGroupTerms)
@@ -102,7 +100,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runGroupSearch(
                 harness.job(2L, VkCrawlJobType.GROUP_SEARCH),
-                new SearchVkGroupsRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkGroupsRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.searchedGroupTerms)
@@ -115,7 +113,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runUserSearch(
                 harness.job(VkCrawlJobType.USER_SEARCH),
-                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkUsersRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.userCandidates.values())
@@ -132,7 +130,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runUserSearch(
                 harness.job(VkCrawlJobType.USER_SEARCH),
-                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkUsersRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.userCandidates.values())
@@ -156,7 +154,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runUserSearch(
                 harness.job(1L, VkCrawlJobType.USER_SEARCH),
-                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkUsersRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.searchedUserCities)
@@ -167,7 +165,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runUserSearch(
                 harness.job(2L, VkCrawlJobType.USER_SEARCH),
-                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkUsersRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.searchedUserCities)
@@ -182,7 +180,7 @@ class VkDiscoveryOrchestratorSearchTest {
         harness.orchestrator.runGroupPostCollection(
                 harness.job(VkCrawlJobType.GROUP_POSTS),
                 5001L,
-                new com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest(10, "HYBRID")
+                new com.ca.centranalytics.integration.channel.vk.api.CollectVkGroupPostsRequest(10)
         );
 
         assertThat(harness.job.getStatus()).isEqualTo(VkCrawlJobStatus.FAILED);
@@ -197,7 +195,7 @@ class VkDiscoveryOrchestratorSearchTest {
 
         harness.orchestrator.runUserSearch(
                 harness.job(VkCrawlJobType.USER_SEARCH),
-                new SearchVkUsersRequest("Еврейская автономная область", 10, "HYBRID")
+                new SearchVkUsersRequest("Еврейская автономная область", 10)
         );
 
         assertThat(harness.job.getStatus()).isEqualTo(VkCrawlJobStatus.FAILED);
@@ -227,7 +225,6 @@ class VkDiscoveryOrchestratorSearchTest {
 
             orchestrator = new VkDiscoveryOrchestrator(
                     officialClient(),
-                    noopFallbackClient(),
                     new VkOfficialGroupCandidateMapper(new VkRegionMatcher()),
                     new VkOfficialUserCandidateMapper(new VkRegionMatcher()),
                     new VkWallSnapshotMapper(),
@@ -237,7 +234,6 @@ class VkDiscoveryOrchestratorSearchTest {
                             unsupportedRepository(VkWallPostSnapshotRepository.class),
                             unsupportedRepository(VkCommentSnapshotRepository.class)
                     ),
-                    new VkFallbackPolicy(),
                     new VkSourceNormalizationService(unsupportedRepository(IntegrationSourceRepository.class)),
                     new VkCrawlJobService(crawlJobRepository, new ObjectMapper()),
                     new VkPostIngestionMapper(new VkAuthorNormalizationService()),
@@ -344,35 +340,6 @@ class VkDiscoveryOrchestratorSearchTest {
                     if (failGroupPosts) {
                         throw new IllegalStateException("VK SDK call failed");
                     }
-                    return List.of();
-                }
-
-                @Override
-                public List<VkCommentResult> getPostComments(Long ownerId, Long postId, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> getUsersByIds(List<Long> userIds) {
-                    return List.of();
-                }
-            };
-        }
-
-        private VkFallbackClient noopFallbackClient() {
-            return new VkFallbackClient() {
-                @Override
-                public List<VkGroupSearchResult> searchGroups(String region, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkUserSearchResult> searchUsers(String region, int limit) {
-                    return List.of();
-                }
-
-                @Override
-                public List<VkWallPostResult> getGroupPosts(Long groupId, int limit) {
                     return List.of();
                 }
 
