@@ -3,6 +3,7 @@ import type { Entity } from "telegram/define.js";
 import { NewMessage, type NewMessageEvent } from "telegram/events/index.js";
 
 import type { BackendIngestionClient } from "../backend/backend-ingestion.client.js";
+import type { GramJsProxyConfig } from "./telegram-proxy-config.js";
 import type { TelegramSessionRepository } from "./telegram-session.repository.js";
 import type { TelegramCurrentSession } from "./telegram-auth.types.js";
 import { TelegramIngestionMapper } from "./telegram-ingestion.mapper.js";
@@ -130,13 +131,7 @@ interface GramJsCollectorRuntimeOptions {
   currentSession: TelegramCurrentSession;
   backendIngestionClient: BackendIngestionClient;
   collectorService: TelegramCollectorService;
-  proxy?: {
-    enabled: boolean;
-    host: string;
-    port: number;
-    username?: string;
-    password?: string;
-  };
+  proxy?: GramJsProxyConfig;
 }
 
 export function createGramJsCollectorRuntimeFactory(
@@ -165,16 +160,7 @@ class GramJsTelegramCollectorRuntime implements TelegramCollectorRuntime {
       {
         connectionRetries: 5,
         useWSS: false,
-        proxy:
-          options.proxy?.enabled === true
-            ? {
-                ip: options.proxy.host,
-                port: options.proxy.port,
-                socksType: 5,
-                username: options.proxy.username,
-                password: options.proxy.password
-              }
-            : undefined
+        proxy: options.proxy
       }
     );
     this.handler = async (event) => {

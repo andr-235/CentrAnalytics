@@ -27,6 +27,8 @@ const envBoolean = (defaultValue: boolean) =>
       return z.NEVER;
     });
 
+const proxyTransportSchema = z.enum(["socks5", "mtproto"]);
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8091),
   HOST: z.string().default("0.0.0.0"),
@@ -34,10 +36,12 @@ const envSchema = z.object({
   TELEGRAM_API_HASH: z.string().min(1),
   TELEGRAM_AUTH_DATA_DIR: z.string().default("./data"),
   TELEGRAM_SOCKS5_PROXY_ENABLED: envBoolean(false),
+  TELEGRAM_PROXY_TRANSPORT: proxyTransportSchema.default("socks5"),
   TELEGRAM_SOCKS5_PROXY_HOST: z.string().default(""),
   TELEGRAM_SOCKS5_PROXY_PORT: z.coerce.number().int().positive().default(1080),
   TELEGRAM_SOCKS5_PROXY_USERNAME: z.string().optional(),
   TELEGRAM_SOCKS5_PROXY_PASSWORD: z.string().optional(),
+  TELEGRAM_MTPROTO_PROXY_SECRET: z.string().optional(),
   BACKEND_INGESTION_BASE_URL: z.string().url(),
   BACKEND_INGESTION_INTERNAL_TOKEN: z.string().min(1),
   TELEGRAM_COLLECTOR_ENABLED: envBoolean(true)

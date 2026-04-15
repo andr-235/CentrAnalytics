@@ -3,28 +3,30 @@ import { BackendIngestionClient } from "./backend/backend-ingestion.client.js";
 import { loadEnv } from "./config/env.js";
 import { FileSessionStore } from "./telegram/file-session-store.js";
 import { createTelegramClientFactory } from "./telegram/gramjs-client.js";
-import { TelegramAuthService } from "./telegram/telegram-auth.service.js";
 import { startCollectorInBackground } from "./telegram/telegram-collector-bootstrap.js";
 import {
   createGramJsCollectorRuntimeFactory,
   TelegramCollectorService
 } from "./telegram/telegram-collector.service.js";
+import { TelegramAuthService } from "./telegram/telegram-auth.service.js";
+import { buildTelegramProxyConfig } from "./telegram/telegram-proxy-config.js";
 
 async function main(): Promise<void> {
   const env = loadEnv();
   const repository = new FileSessionStore(env.TELEGRAM_AUTH_DATA_DIR);
+  const proxy = buildTelegramProxyConfig({
+    enabled: env.TELEGRAM_SOCKS5_PROXY_ENABLED,
+    transport: env.TELEGRAM_PROXY_TRANSPORT,
+    host: env.TELEGRAM_SOCKS5_PROXY_HOST,
+    port: env.TELEGRAM_SOCKS5_PROXY_PORT,
+    username: env.TELEGRAM_SOCKS5_PROXY_USERNAME,
+    password: env.TELEGRAM_SOCKS5_PROXY_PASSWORD,
+    secret: env.TELEGRAM_MTPROTO_PROXY_SECRET
+  });
   const clientFactory = createTelegramClientFactory({
     apiId: env.TELEGRAM_API_ID,
     apiHash: env.TELEGRAM_API_HASH,
-    proxy: env.TELEGRAM_SOCKS5_PROXY_ENABLED
-      ? {
-          enabled: true,
-          host: env.TELEGRAM_SOCKS5_PROXY_HOST,
-          port: env.TELEGRAM_SOCKS5_PROXY_PORT,
-          username: env.TELEGRAM_SOCKS5_PROXY_USERNAME,
-          password: env.TELEGRAM_SOCKS5_PROXY_PASSWORD
-        }
-      : undefined
+    proxy
   });
   const backendIngestionClient = new BackendIngestionClient(
     env.BACKEND_INGESTION_BASE_URL,
@@ -39,15 +41,7 @@ async function main(): Promise<void> {
       markEventReceived: () => collectorService.markEventReceived(),
       markRuntimeError: (error: unknown) => collectorService.markRuntimeError(error)
     } as TelegramCollectorService,
-    proxy: env.TELEGRAM_SOCKS5_PROXY_ENABLED
-      ? {
-          enabled: true,
-          host: env.TELEGRAM_SOCKS5_PROXY_HOST,
-          port: env.TELEGRAM_SOCKS5_PROXY_PORT,
-          username: env.TELEGRAM_SOCKS5_PROXY_USERNAME,
-          password: env.TELEGRAM_SOCKS5_PROXY_PASSWORD
-        }
-      : undefined
+    proxy
   });
   collectorService = new TelegramCollectorService(repository, collectorRuntimeFactory);
   const telegramAuthService = new TelegramAuthService(repository, clientFactory, {

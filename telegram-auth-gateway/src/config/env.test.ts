@@ -36,4 +36,25 @@ describe("loadEnv", () => {
     expect(env.TELEGRAM_SOCKS5_PROXY_ENABLED).toBe(true);
     expect(env.TELEGRAM_COLLECTOR_ENABLED).toBe(true);
   });
+
+  it("defaults proxy transport to socks5", () => {
+    const env = loadEnv(baseEnv());
+
+    expect(env.TELEGRAM_PROXY_TRANSPORT).toBe("socks5");
+  });
+
+  it("parses mtproto proxy transport settings", () => {
+    const env = loadEnv(
+      baseEnv({
+        TELEGRAM_PROXY_TRANSPORT: "mtproto",
+        TELEGRAM_SOCKS5_PROXY_ENABLED: "true",
+        TELEGRAM_SOCKS5_PROXY_HOST: "mtproxy.internal",
+        TELEGRAM_SOCKS5_PROXY_PORT: "443",
+        TELEGRAM_MTPROTO_PROXY_SECRET: "secret-value"
+      })
+    );
+
+    expect(env.TELEGRAM_PROXY_TRANSPORT).toBe("mtproto");
+    expect(env.TELEGRAM_MTPROTO_PROXY_SECRET).toBe("secret-value");
+  });
 });

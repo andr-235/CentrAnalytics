@@ -4,6 +4,7 @@ import {
   TelegramAuthError,
   type TelegramCodeDeliveryType
 } from "./telegram-auth.types.js";
+import type { GramJsProxyConfig } from "./telegram-proxy-config.js";
 import type {
   TelegramClientFactory,
   TelegramGatewayClient,
@@ -17,13 +18,7 @@ const { StringSession } = sessions;
 export interface TelegramClientFactoryOptions {
   apiId: number;
   apiHash: string;
-  proxy?: {
-    enabled: boolean;
-    host: string;
-    port: number;
-    username?: string;
-    password?: string;
-  };
+  proxy?: GramJsProxyConfig;
 }
 
 export function createTelegramClientFactory(
@@ -33,16 +28,7 @@ export function createTelegramClientFactory(
     const client = new TelegramClient(new StringSession(session ?? ""), options.apiId, options.apiHash, {
       connectionRetries: 3,
       useWSS: false,
-      proxy:
-        options.proxy?.enabled === true
-          ? {
-              ip: options.proxy.host,
-              port: options.proxy.port,
-              socksType: 5,
-              username: options.proxy.username,
-              password: options.proxy.password
-            }
-          : undefined
+      proxy: options.proxy
     });
 
     await client.connect();
